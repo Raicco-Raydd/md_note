@@ -1,0 +1,18 @@
+{
+  "name": "MindDepot Note",
+  "short_name": "MD_Note",
+  "description": "图形化 Markdown 笔记工具 — 本地优先，数据不出浏览器（MD = Markdown 双关）",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23161a22'/%3E%3Ctext x='50' y='62' font-size='38' text-anchor='middle' fill='%234fd6be' font-family='sans-serif'%3E%F0%9F%A6%8A%3C/text%3E%3C/svg%3E",
+    "sizes": "192x192",
+    "type": "image/svg+xml"
+  }
+]
+}
