@@ -1160,6 +1160,48 @@ $("bannerClose").addEventListener("click", () => {
 });
 if (localStorage.getItem("md_note_banner_closed")) $("banner").style.display = "none";
 
+// ── 主题切换（日间 / 夜间 / 跟随系统，三态循环） ──
+const THEME_MODES = [
+  { key: "auto",  icon: "🖥", label: "跟随系统" },
+  { key: "light", icon: "☀️", label: "日间" },
+  { key: "dark",  icon: "🌙", label: "夜间" },
+];
+let themeIdx = 0;
+const themeBtn = $("themeBtn");
+const metaTheme = document.querySelector('meta[name="theme-color"]');
+
+function syncThemeColor(key) {
+  if (!metaTheme) return;
+  const dark = key === "dark" || (key === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  metaTheme.content = dark ? "#0f1115" : "#f6f7f9";
+}
+
+function applyTheme(idx, persist) {
+  idx = ((idx % THEME_MODES.length) + THEME_MODES.length) % THEME_MODES.length;
+  themeIdx = idx;
+  const m = THEME_MODES[idx];
+  if (m.key === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", m.key);
+  if (persist) { try { localStorage.setItem("md_note_theme", m.key); } catch (e) { /* 忽略 */ } }
+  themeBtn.innerHTML = m.icon + '<span class="theme-lbl"> ' + m.label + "</span>";
+  themeBtn.title = "主题：" + m.label + "（点击切换）";
+  syncThemeColor(m.key);
+}
+
+(function themeInit() {
+  let cur = "auto";
+  try { cur = localStorage.getItem("md_note_theme") || "auto"; } catch (e) { /* 忽略 */ }
+  const idx = THEME_MODES.findIndex((m) => m.key === cur);
+  applyTheme(idx < 0 ? 0 : idx, false);
+  themeBtn.addEventListener("click", () => applyTheme(themeIdx + 1, true));
+  // 跟随系统模式：系统深浅变化时同步浏览器 UI 颜色
+  try {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (THEME_MODES[themeIdx].key === "auto") syncThemeColor("auto");
+    });
+  } catch (e) { /* 忽略 */ }
+})();
+
 // ── PWA ───────────────────────────────
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => { /* 忽略 */ });
