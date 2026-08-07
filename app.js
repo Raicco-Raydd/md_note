@@ -2019,14 +2019,188 @@ function sortTreeData() {
   renderTree(treeData);
 }
 
-// ── 首次使用引导 ──────────────────────
-try {
-  if (!localStorage.getItem("md_note_tour_done")) $("tourOverlay").classList.add("show");
-} catch (e) { /* 忽略 */ }
-$("tourOk").addEventListener("click", () => {
-  $("tourOverlay").classList.remove("show");
+// ── 动画式引导（聚光灯教程，mdutils 同款） ──
+const tourMask = document.createElement("div");
+tourMask.className = "tour-mask";
+const tourSpot = document.createElement("div");
+tourSpot.className = "tour-spot";
+const tourCard = document.createElement("div");
+tourCard.className = "tour-card";
+document.body.append(tourMask, tourSpot, tourCard);
+
+let tourSteps = [];
+let tourIdx = 0;
+let tourActive = false;
+let tourScrollRaf = null;
+
+function getTourEl(step) { return step.el || document.querySelector(step.sel); }
+
+function buildTourSteps() {
+  return [
+    { sel: ".brand", title: "① 欢迎", text: "MindDepot Note —— 本地优先的图形化 Markdown 笔记工具，手机 / iPad / PC 三位一体。", side: "bottom" },
+    { sel: "#openVaultBtn", title: "② 打开笔记库", text: "选择真实文件夹（PC/安卓 Chrome/Edge），或使用浏览器私有存储（iPhone/iPad）。", side: "bottom" },
+    { sel: "#newNoteBtn", title: "③ 新建笔记", text: "在笔记库中新建 .md 笔记；右键文件夹可建子文件夹、重命名、删除。", side: "bottom" },
+    { sel: "#searchBox", title: "④ 全文搜索", text: "文件名 / 标题 / 正文都能搜；逗号分隔多关键词；找不到有「是否想找」推荐。", side: "bottom" },
+    { sel: "#blockEditor", title: "⑤ 块编辑器", text: "Notion 风格：输入 / 选块类型，Aa 切换，⠿ 拖拽排序，Enter 智能分块，底部实时字数统计。", side: "left" },
+    { sel: ".switch", title: "⑥ 自动保存", text: "每分钟自动落盘，滑块开关随你；保存按钮亮绿 = 有未保存更改。", side: "bottom" },
+    { sel: "#outlineBtn", title: "⑦ 大纲导航", text: "标题跳转、上下章节、节号直达；旁边 🕘 是最近打开的笔记。", side: "left" },
+    { sel: "#normalActions", title: "⑧ 笔记库工具", text: "导出备份（全量 / 右键 / 勾选）、排序、导入（zip 恢复 / 单文件）。", side: "bottom" },
+    { sel: "#importBtn", title: "⑨ 示例笔记库", text: "导入附带的示例库立即体验：密位测距、战术学、作文素材，搜索一下「密位」试试。", side: "bottom", action: { label: "📥 导入示例笔记库", fn: importExample } },
+  ];
+}
+
+function startTour() {
+  if (tourActive) return;
+  tourSteps = buildTourSteps();
+  if (!tourSteps.length) return;
+  tourActive = true;
+  tourMask.style.display = "block";
+  tourSpot.style.display = "block";
+  tourCard.style.display = "block";
+  tourMask.addEventListener("click", tourMaskClick);
+  window.addEventListener("scroll", tourOnScroll, { capture: true, passive: true });
+  window.addEventListener("resize", tourOnScroll);
+  tourShowStep(0);
+}
+
+function endTour() {
+  if (!tourActive) return;
+  tourActive = false;
+  tourMask.style.display = "none";
+  tourSpot.style.display = "none";
+  tourCard.style.display = "none";
+  tourMask.removeEventListener("click", tourMaskClick);
+  window.removeEventListener("scroll", tourOnScroll, { capture: true });
+  window.removeEventListener("resize", tourOnScroll);
   try { localStorage.setItem("md_note_tour_done", "1"); } catch (e) { /* 忽略 */ }
-});
+}
+
+function tourMaskClick() {
+  if (tourIdx >= tourSteps.length - 1) endTour();
+  else tourShowStep(tourIdx + 1);
+}
+
+function tourShowStep(i) {
+  tourIdx = i;
+  const step = tourSteps[i];
+  if (!step) { endTour(); return; }
+  const el = getTourEl(step);
+  if (!el) { tourMaskClick(); return; }
+  el.scrollIntoView({ block: "center", behavior: "auto" });
+  setTimeout(() => {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) {
+      setTimeout(() => tourShowStep(tourIdx), 250);
+      return;
+    }
+    tourSpot.style.left = (r.left - 6) + "px";
+    tourSpot.style.top = (r.top - 6) + "px";
+    tourSpot.style.width = (r.width + 12) + "px";
+    tourSpot.style.height = (r.height + 12) + "px";
+    tourRenderCard(step);
+  }, 80);
+}
+
+function tourRenderCard(step) {
+  const total = tourSteps.length;
+  const dots = tourSteps.map((_, j) =>
+    `<span class="dot ${j === tourIdx ? "active" : ""}"></span>`
+  ).join("");
+  tourCard.innerHTML = `
+    <div class="tour-top">
+      <span class="step">${tourIdx + 1} / ${total}</span>
+      <a id="tourSkip">跳过引导</a>
+    </div>
+    <h3>${step.title}</h3>
+    <p>${step.text}</p>
+    ${step.action ? `<button id="tourAction" class="primary tour-action">${step.action.label}</button>` : ""}
+    <div class="tour-nav">
+      <button id="tourPrev" class="ghost" ${tourIdx === 0 ? "disabled" : ""}>← 上一步</button>
+      <div class="tour-dots">${dots}</div>
+      <button id="tourNext" class="primary">${tourIdx === total - 1 ? "完成 ✓" : "下一步 →"}</button>
+    </div>`;
+  const prev = $("tourPrev");
+  if (prev) prev.addEventListener("click", () => tourShowStep(tourIdx - 1));
+  const next = $("tourNext");
+  if (next) next.addEventListener("click", () => tourIdx >= total - 1 ? endTour() : tourShowStep(tourIdx + 1));
+  const skip = $("tourSkip");
+  if (skip) skip.addEventListener("click", endTour);
+  const act = $("tourAction");
+  if (act && step.action) act.addEventListener("click", step.action.fn);
+  const el = getTourEl(step);
+  if (el) tourPositionCard(el.getBoundingClientRect(), step.side);
+}
+
+function tourPositionCard(rect, side) {
+  const W = tourCard.offsetWidth;
+  const H = tourCard.offsetHeight;
+  const pad = 14;
+  let x, y;
+  if (side === "bottom") { x = rect.left + rect.width / 2 - W / 2; y = rect.bottom + pad; }
+  else if (side === "top") { x = rect.left + rect.width / 2 - W / 2; y = rect.top - pad - H; }
+  else if (side === "left") {
+    x = rect.left - pad - W;
+    y = rect.top + rect.height / 2 - H / 2;
+    if (x < 8) x = rect.right + pad;
+  } else {
+    x = rect.right + pad;
+    y = rect.top + rect.height / 2 - H / 2;
+  }
+  x = Math.max(8, Math.min(x, innerWidth - W - 8));
+  y = Math.max(8, Math.min(y, innerHeight - H - 8));
+  tourCard.style.left = x + "px";
+  tourCard.style.top = y + "px";
+}
+
+function tourOnScroll() {
+  if (!tourActive || tourScrollRaf) return;
+  tourScrollRaf = requestAnimationFrame(() => {
+    tourScrollRaf = null;
+    const step = tourSteps[tourIdx];
+    if (!step) return;
+    const el = getTourEl(step);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    tourSpot.style.left = (r.left - 6) + "px";
+    tourSpot.style.top = (r.top - 6) + "px";
+    tourSpot.style.width = (r.width + 12) + "px";
+    tourSpot.style.height = (r.height + 12) + "px";
+    tourPositionCard(r, step.side);
+  });
+}
+
+// 导入示例笔记库（examples/ExampleNote.zip → 「示例笔记库」文件夹）
+async function importExample() {
+  if (!vaultRoot) { setMsg("请先打开笔记库再导入示例", true); return; }
+  try {
+    const res = await fetch("./examples/ExampleNote.zip");
+    if (!res.ok) throw new Error("示例文件加载失败");
+    const files = await MdBackup.parseZip(await res.arrayBuffer());
+    let n = 0;
+    for (const f of files) {
+      if (f.path.includes("..") || f.path.startsWith("/") || f.path.includes("\\")) continue;
+      if (f.path.endsWith("/")) continue;
+      const parts = ["示例笔记库", ...f.path.split("/").filter(Boolean)];
+      let dir = vaultRoot;
+      for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i], { create: true });
+      const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+      const w = await fh.createWritable();
+      await w.write(f.content);
+      await w.close();
+      n++;
+    }
+    await refreshTree();
+    setMsg(`✅ 示例笔记库已导入（${n} 个文件），试试搜索「密位」`);
+  } catch (err) {
+    setMsg("示例导入失败: " + err.message, true);
+  }
+}
+
+// 首次打开自动播放引导；❓ 按钮可重播
+$("tourBtn").addEventListener("click", startTour);
+try {
+  if (!localStorage.getItem("md_note_tour_done")) setTimeout(startTour, 400);
+} catch (e) { /* 忽略 */ }
 
 // ── 导入单个 .md / .txt 文件（重名自动加序号） ──
 async function importFiles() {
@@ -2098,7 +2272,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.11.0";
+const APP_VERSION = "4.12.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
