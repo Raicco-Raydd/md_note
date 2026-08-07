@@ -123,6 +123,74 @@
     return "---\n" + key + ": " + value + "\n---\n" + text;
   }
 
+  // ========== HTML 清洗（XSS 防御 · 白名单制）==========
+  // 仅保留常用排版标签；属性按标签白名单放行；事件属性/危险协议一律丢弃。
+  // 用于 marked.parse() 输出注入 innerHTML 之前的最后一道闸。
+  var SANITIZE_ALLOWED_TAGS = {
+    p: 1, br: 1, hr: 1, h1: 1, h2: 1, h3: 1, h4: 1, h5: 1, h6: 1,
+    ul: 1, ol: 1, li: 1, dl: 1, dt: 1, dd: 1,
+    blockquote: 1, pre: 1, code: 1, em: 1, strong: 1, b: 1, i: 1,
+    a: 1, img: 1, table: 1, thead: 1, tbody: 1, tr: 1, th: 1, td: 1,
+    mark: 1, del: 1, s: 1, sub: 1, sup: 1, span: 1, div: 1,
+    details: 1, summary: 1, kbd: 1, samp: 1, var: 1, abbr: 1, cite: 1,
+    small: 1, figure: 1, figcaption: 1, input: 1
+  };
+  var SANITIZE_ATTR_RULES = {
+    a: { href: /^(https?:|mailto:|#|\.{0,2}\/)/i, title: 1, target: /^_blank$/i, rel: 1 },
+    img: { src: /^(https?:|data:image\/|\.{0,2}\/)/i, alt: 1, title: 1, width: /^\d+$/, height: /^\d+$/ },
+    code: { class: /^language-[a-z0-9_+-]+$/i },
+    pre: { class: /^language-[a-z0-9_+-]+$/i },
+    th: { colspan: /^\d+$/, rowspan: /^\d+$/ },
+    td: { colspan: /^\d+$/, rowspan: /^\d+$/ },
+    mark: { class: /^[a-z0-9_-]+$/i },
+    span: { class: /^[a-z0-9_ -]+$/i },
+    input: { type: /^checkbox$/i, disabled: 1, checked: 1 }
+  };
+  var SANITIZE_TAG_RE = /<\s*(\/?)([a-zA-Z][a-zA-Z0-9]*)((?:"[^"]*"|'[^']*'|[^"'>])*)>/g;
+  var SANITIZE_ATTR_RE = /([a-zA-Z-]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s"'=<>`]+))?/g;
+
+  function sanitizeHtml(input) {
+    if (!input) return "";
+    var out = "";
+    var last = 0;
+    var m;
+    while ((m = SANITIZE_TAG_RE.exec(input)) !== null) {
+      out += input.slice(last, m.index).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      var closing = m[1] === "/";
+      var tag = m[2].toLowerCase();
+      var attrsRaw = m[3] || "";
+      if (closing) {
+        if (Object.prototype.hasOwnProperty.call(SANITIZE_ALLOWED_TAGS, tag)) out += "</" + tag + ">";
+      } else if (Object.prototype.hasOwnProperty.call(SANITIZE_ALLOWED_TAGS, tag)) {
+        var rules = SANITIZE_ATTR_RULES[tag];
+        var attrs = "";
+        var am;
+        SANITIZE_ATTR_RE.lastIndex = 0;
+        while ((am = SANITIZE_ATTR_RE.exec(attrsRaw)) !== null) {
+          var name = am[1].toLowerCase();
+          if (/^on/i.test(name)) continue; // 事件属性一律丢弃
+          if (!rules || !Object.prototype.hasOwnProperty.call(rules, name)) continue;
+          var val = "";
+          if (am[2]) {
+            var q = am[2].charAt(0);
+            val = (q === '"' || q === "'") ? am[2].slice(1, -1) : am[2];
+          }
+          var ok = rules[name] === 1 ? true : rules[name].test(val);
+          if (!ok) continue;
+          if (rules[name] === 1 && val === "") {
+            attrs += " " + name;
+          } else {
+            attrs += " " + name + '="' + val.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + '"';
+          }
+        }
+        out += "<" + tag + attrs + ">";
+      }
+      last = m.index + m[0].length;
+    }
+    out += input.slice(last).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    return out;
+  }
+
   return {
     parseHeadings: parseHeadings,
     extractSection: extractSection,
@@ -131,5 +199,6 @@
     insertAfterHeading: insertAfterHeading,
     insertSectionAfter: insertSectionAfter,
     updateFrontmatter: updateFrontmatter,
+    sanitizeHtml: sanitizeHtml,
   };
 });

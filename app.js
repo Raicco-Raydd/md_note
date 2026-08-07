@@ -597,9 +597,7 @@ function syncTitleFromContent() {
 }
 
 function renderPreview() {
-  const html = marked.parse($("editorText").value)
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+  const html = Mdutils.sanitizeHtml(marked.parse($("editorText").value));
   const pv = $("preview");
   pv.innerHTML = html;
   pv.querySelectorAll("pre code").forEach((el) => { try { hljs.highlightElement(el); } catch (e) { /* 忽略 */ } });
@@ -805,9 +803,7 @@ function setEditorMode(mode) {
 }
 
 function renderEditPreview() {
-  const html = marked.parse(editText.value)
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+  const html = Mdutils.sanitizeHtml(marked.parse(editText.value));
   const el = $("editPreview");
   el.innerHTML = html;
   el.querySelectorAll("pre code").forEach((c) => { try { hljs.highlightElement(c); } catch (e) { /* 忽略 */ } });
@@ -2272,7 +2268,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.13.0";
+const APP_VERSION = "4.13.1";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;

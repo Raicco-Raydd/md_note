@@ -1,3 +1,10 @@
+## v4.13.1 — 2026-08-07（安全修复 · 4.13.0 → 4.13.1）
+
+### 🔒 安全修复
+
+- **Markdown 渲染 XSS 修复**：marked.parse 输出注入 innerHTML 前新增白名单制 sanitizeHtml 清洗（事件属性 / javascript: / data: 协议 / 非白名单标签一律丢弃），替代原仅过滤 script/iframe 的不完整方案
+- **安全响应头**：新增 _headers（CSP / X-Frame-Options / X-Content-Type-Options / Referrer-Policy / Permissions-Policy）
+- 新增 sanitize.test.js（24 用例），全套测试通过（sanitize 24 + search 25 + backup 10 + blocks 22）
 ## v4.13.0 — 2026-08-07（功能更新 · 4.12.0 → 4.13.0）
 
 ### ✨ 新增
