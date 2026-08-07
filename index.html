@@ -178,6 +178,7 @@
   }
   .tree-title { font-size: 13px; color: var(--text-dim); letter-spacing: 1px; padding: 4px 10px 8px; text-transform: uppercase; display: flex; align-items: center; }
   .tree-title > span:first-child { flex: 1; }
+  .tree-title .ver { color: var(--accent); font-weight: 700; font-size: 11px; margin-right: 4px; flex: none; }
   .tree-actions { display: flex; gap: 2px; }
   .tree-actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 4px; }
   .tree-actions button:hover { color: var(--accent); background: var(--bg); }
@@ -326,9 +327,23 @@
   .outline-item:hover { background: var(--panel-2); color: var(--accent); }
   .outline-empty { color: var(--text-dim); font-size: 12px; padding: 8px; text-align: center; }
   #noteTitle {
-    flex: none; padding: 9px 14px; font-size: 15px; font-weight: 600;
+    flex: 1; min-width: 0; padding: 9px 14px; font-size: 15px; font-weight: 600;
     background: var(--panel); color: var(--text-strong);
     border: none; border-bottom: 1px solid var(--border); outline: none;
+  }
+  .title-row { display: flex; align-items: center; flex: none; min-width: 0; }
+  .title-nav {
+    display: flex; gap: 4px; align-items: center; flex: none;
+    padding: 0 10px; border-bottom: 1px solid var(--border); align-self: stretch;
+  }
+  .title-nav button {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); font-size: 11px; padding: 3px 6px; cursor: pointer; white-space: nowrap;
+  }
+  .title-nav button:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg); }
+  .title-nav input {
+    width: 50px; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 3px 5px; font-size: 11px; outline: none;
   }
   #noteTitle::placeholder { color: var(--text-dim); font-weight: 400; }
   #editorText {
@@ -641,6 +656,8 @@
     .editor-pane { flex: 1 1 45%; }
     .preview-pane { flex: 1 1 55%; border-top: 1px solid var(--border); }
     .editor-tools .lbl { display: none; } /* 移动端只留图标 */
+    .title-nav button { padding: 3px 4px; font-size: 10px; }
+    .title-nav input { width: 40px; padding: 3px 4px; font-size: 10px; }
     .banner { padding: 6px 36px 6px 12px; font-size: 11px; }
     .edit-overlay { width: 100%; }
     .insert-menu { width: calc(100vw - 28px); }
@@ -670,7 +687,7 @@
   <button type="button" id="drawerBtn" class="drawer-btn" title="笔记列表">☰</button>
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
-    <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
+    <div class="tree-title"><span class="ver" id="verBadge"></span><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
       <button id="exportBtn" title="导出备份（zip）">📤</button>
       <button id="sortBtn" title="排序：文件名 · 正序">🔃</button>
       <button id="importBtn" title="导入恢复（zip）">📥</button>
@@ -691,7 +708,17 @@
 
   <section class="editor-area">
     <div class="editor-pane">
-      <input id="noteTitle" placeholder="笔记标题（回车插入标题块）" spellcheck="false" disabled>
+      <div class="title-row">
+        <input id="noteTitle" placeholder="笔记标题（回车插入标题块）" spellcheck="false" disabled>
+        <div class="title-nav">
+          <button type="button" data-nav="prev-ch" title="上一章">⏮章</button>
+          <button type="button" data-nav="prev-sec" title="上一节">↑节</button>
+          <button type="button" data-nav="next-sec" title="下一节">↓节</button>
+          <button type="button" data-nav="next-ch" title="下一章">章⏭</button>
+          <input type="number" id="gotoSec" min="1" placeholder="节号">
+          <button type="button" data-nav="goto" title="跳转到第 N 节">跳转</button>
+        </div>
+      </div>
       <div class="editor-tools">
         <button type="button" id="recentBtn" title="最近打开的笔记">🕘<span class="lbl"> 最近</span></button>
         <button type="button" id="outlineBtn" title="笔记大纲">📑<span class="lbl"> 大纲</span></button>

@@ -1841,6 +1841,13 @@ $("sortMenu").addEventListener("click", (e) => {
 document.addEventListener("click", () => $("sortMenu").classList.remove("show"));
 refreshSortBtn(); // 启动时同步排序按钮状态
 
+// 版本号（主题亮绿色，树标题栏左侧）
+const APP_VERSION = "4.0.0";
+(function () {
+  const v = $("verBadge");
+  if (v) v.textContent = "v" + APP_VERSION;
+})();
+
 // 最近笔记菜单交互
 $("recentBtn").addEventListener("click", (e) => {
   e.stopPropagation();
@@ -1865,20 +1872,11 @@ const outlinePanel = $("outlinePanel");
 function renderOutline() {
   const items = [];
   blocks.forEach((b, i) => { if (b.type === "heading") items.push({ level: b.level || 1, content: b.content || "", idx: i }); });
-  const nav = `<div class="outline-nav">` +
-    `<button type="button" data-nav="prev-ch" title="上一章">⏮ 章</button>` +
-    `<button type="button" data-nav="prev-sec" title="上一节">↑ 节</button>` +
-    `<button type="button" data-nav="next-sec" title="下一节">↓ 节</button>` +
-    `<button type="button" data-nav="next-ch" title="下一章">章 ⏭</button>` +
-    `<input type="number" id="gotoSec" min="1" placeholder="节号">` +
-    `<button type="button" data-nav="goto" title="跳转到第 N 节">跳转</button>` +
-    `</div>`;
   if (!items.length) {
-    outlinePanel.innerHTML = nav + '<div class="outline-empty">此笔记没有标题块</div>';
-    bindOutlineNav();
+    outlinePanel.innerHTML = '<div class="outline-empty">此笔记没有标题块</div>';
     return;
   }
-  outlinePanel.innerHTML = nav + items.map((it) =>
+  outlinePanel.innerHTML = items.map((it) =>
     `<button class="outline-item" data-idx="${it.idx}" style="padding-left:${8 + (it.level - 1) * 14}px">${escapeHtml(it.content) || "(空标题)"}</button>`
   ).join("");
   outlinePanel.querySelectorAll(".outline-item").forEach((btn) => {
@@ -1889,7 +1887,6 @@ function renderOutline() {
       outlinePanel.classList.remove("show");
     });
   });
-  bindOutlineNav();
 }
 
 // ── 节数跳转 ──────────────────────────
@@ -1942,16 +1939,15 @@ function navChapter(offset) {
 }
 
 function bindOutlineNav() {
-  outlinePanel.querySelectorAll("[data-nav]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
+  document.querySelectorAll(".title-nav [data-nav]").forEach((btn) => {
+    btn.addEventListener("click", () => {
       const act = btn.dataset.nav;
       if (act === "prev-sec") navSection(-1);
       else if (act === "next-sec") navSection(1);
       else if (act === "prev-ch") navChapter(-1);
       else if (act === "next-ch") navChapter(1);
       else if (act === "goto") {
-        const n = parseInt(outlinePanel.querySelector("#gotoSec").value, 10);
+        const n = parseInt(document.querySelector("#gotoSec").value, 10);
         const hs = headingBlocks();
         if (!isNaN(n) && n >= 1 && n <= hs.length) gotoBlock(hs[n - 1].idx);
         else setMsg(`⚠️ 节号应在 1-${hs.length} 之间`, true);
@@ -1959,6 +1955,7 @@ function bindOutlineNav() {
     });
   });
 }
+bindOutlineNav(); // 标题行跳转按钮（一次性绑定）
 
 outlineBtn.addEventListener("click", (e) => {
   e.stopPropagation();
