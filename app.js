@@ -660,22 +660,41 @@ $("noteTitle").addEventListener("change", () => {
   setMsg("✏️ 标题已更新，记得保存");
 });
 
-// ── 未保存状态 + 防抖自动保存 ────────
+// ── 自动保存（用户可开关，每分钟）+ 保存状态 ──
 let dirty = false;
 let autoSaveTimer = null;
+let autoSaveEnabled = true;
+try { autoSaveEnabled = localStorage.getItem("md_note_autosave") !== "0"; } catch (e) { /* 忽略 */ }
+const AUTOSAVE_MS = 60000; // 自动保存周期：每分钟
+
+function setSaveState(s) {
+  const el = $("saveState");
+  el.className = "save-state" + (s === "saving" ? " saving" : s === "error" ? " error" : "");
+  el.textContent = {
+    autooff: "自动保存关闭",
+    dirty: "未自动保存",
+    saving: "保存中…",
+    saved: "已自动保存",
+    error: "保存失败",
+  }[s] || "";
+}
+
 function markDirty() {
   dirty = true;
   $("saveBtn").classList.add("dirty");
   $("saveBtn").title = "有未保存的更改";
+  setSaveState(autoSaveEnabled ? "dirty" : "autooff");
 }
 function clearDirty() {
   dirty = false;
   $("saveBtn").classList.remove("dirty");
   $("saveBtn").title = "保存 (Ctrl+S)";
+  setSaveState(autoSaveEnabled ? "saved" : "autooff");
 }
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(() => saveNote(true), 1500);
+  if (!autoSaveEnabled) return;
+  autoSaveTimer = setTimeout(() => saveNote(true), AUTOSAVE_MS);
 }
 function saveIfDirty() {
   if (dirty) saveNote(true);
@@ -683,6 +702,7 @@ function saveIfDirty() {
 
 async function saveNote(silent) {
   if (!currentNote) return;
+  setSaveState("saving");
   currentNote.content = MdBlocks.serializeBlocks(blocks);
   $("editorText").value = currentNote.content;
   try {
@@ -692,9 +712,25 @@ async function saveNote(silent) {
     clearDirty();
     if (!silent) setMsg(`💾 已保存 ${currentNote.name}`);
   } catch (err) {
+    setSaveState("error");
     if (!silent) setMsg("保存失败: " + err.message, true);
   }
 }
+
+// 自动保存开关
+$("autoSaveToggle").checked = autoSaveEnabled;
+$("autoSaveToggle").addEventListener("change", (e) => {
+  autoSaveEnabled = e.target.checked;
+  try { localStorage.setItem("md_note_autosave", autoSaveEnabled ? "1" : "0"); } catch (err) { /* 忽略 */ }
+  if (autoSaveEnabled) {
+    setSaveState(dirty ? "dirty" : "saved");
+    if (dirty) scheduleAutoSave();
+  } else {
+    clearTimeout(autoSaveTimer);
+    setSaveState("autooff");
+  }
+});
+setSaveState(autoSaveEnabled ? "saved" : "autooff");
 
 // ── 结构化编辑（区块替换/插入/添加/删除） ──
 const editPanel = $("editPanel");
@@ -1877,7 +1913,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.1.2";
+const APP_VERSION = "4.2.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;

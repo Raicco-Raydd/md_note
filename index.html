@@ -157,6 +157,19 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(79,214,190,.25); }
     50% { box-shadow: 0 0 0 4px rgba(79,214,190,.08); }
   }
+  /* 自动保存开关 + 保存状态 */
+  .switch { position: relative; display: inline-block; width: 34px; height: 18px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: var(--border); border-radius: 18px; transition: .2s; cursor: pointer; }
+  .slider::before {
+    content: ""; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px;
+    background: var(--panel); border-radius: 50%; transition: .2s;
+  }
+  .switch input:checked + .slider { background: var(--accent-dim); }
+  .switch input:checked + .slider::before { transform: translateX(16px); background: var(--bg); }
+  .save-state { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+  .save-state.saving { color: var(--accent); font-weight: 600; }
+  .save-state.error { color: var(--err); }
 
   .banner {
     flex: none;
@@ -682,6 +695,11 @@
   <button type="button" id="newNoteBtn" class="ghost" disabled>➕ 新建笔记</button>
   <button type="button" id="openVaultBtn">📂 打开笔记库</button>
   <button type="button" id="saveBtn" class="ghost" disabled>💾 保存</button>
+  <label class="switch" id="autoSaveWrap" title="自动保存：每分钟写盘一次">
+    <input type="checkbox" id="autoSaveToggle">
+    <span class="slider"></span>
+  </label>
+  <span class="save-state" id="saveState"></span>
   <button type="button" id="themeBtn" class="ghost" title="主题：跟随系统">🖥<span class="theme-lbl"> 主题</span></button>
   <div class="msg" id="msg"></div>
 </header>
