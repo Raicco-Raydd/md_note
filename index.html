@@ -185,6 +185,22 @@
   .tree-row.selecting { cursor: pointer; }
   .tree-row.selecting:hover { background: var(--panel-2); }
   #selectActions button { font-size: 11px; padding: 2px 6px; }
+  /* 勾选模式操作条 */
+  .select-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; margin: 0 8px 6px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    font-size: 12px;
+  }
+  .select-bar .sel-count { color: var(--text-dim); white-space: nowrap; flex: none; }
+  .select-bar .sel-btns { display: flex; gap: 4px; flex: 1; justify-content: flex-end; flex-wrap: wrap; }
+  .select-bar button {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; white-space: nowrap;
+  }
+  .select-bar button:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg); }
+  .select-bar button.primary { background: var(--accent-dim); color: #05120f; border-color: transparent; font-weight: 600; }
+  .select-bar button.primary:hover { background: var(--accent); }
   .tree { list-style: none; }
   .tree ul { list-style: none; padding-left: 16px; position: relative; }
   .tree ul.collapsed { display: none; }
@@ -566,11 +582,21 @@
   <button type="button" id="drawerBtn" class="drawer-btn" title="笔记列表">☰</button>
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
-    <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions">
+    <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
       <button id="exportBtn" title="导出备份（zip）">📤</button>
-      <span id="normalActions"><button id="importBtn" title="导入恢复（zip）">📥</button><button id="newFolderBtn" title="新建文件夹">📁</button><button id="newNoteBtn" title="新建笔记">➕</button></span>
-      <span id="selectActions" style="display:none"><button id="selAllBtn" title="全选所有笔记">☑ 全选</button><button id="selInvertBtn" title="反选">⇄ 反选</button><button id="selClearBtn" title="取消选择">✕ 取消</button></span>
+      <button id="importBtn" title="导入恢复（zip）">📥</button>
+      <button id="newFolderBtn" title="新建文件夹">📁</button>
+      <button id="newNoteBtn" title="新建笔记">➕</button>
     </span></div>
+    <div class="select-bar" id="selectBar" style="display:none">
+      <span class="sel-count" id="selCount">已选 0 项</span>
+      <span class="sel-btns">
+        <button id="selAllBtn" title="全选所有笔记">☑ 全选</button>
+        <button id="selInvertBtn" title="反选">⇄ 反选</button>
+        <button id="selExportBtn" title="导出所选为 zip">📤 导出所选</button>
+        <button id="selClearBtn" title="取消选择">✕ 取消</button>
+      </span>
+    </div>
     <ul class="tree" id="tree"></ul>
   </aside>
 

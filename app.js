@@ -1334,8 +1334,9 @@ function enterSelectMode() {
   if (sb) sb.value = "";
   $("treeTitleText").textContent = "选择笔记";
   $("normalActions").style.display = "none";
-  $("selectActions").style.display = "";
-  $("exportBtn").textContent = "📤 导出所选";
+  $("exportBtn").style.display = "none";
+  $("selectBar").style.display = "flex";
+  updateSelUI();
   renderTree(treeData);
 }
 
@@ -1344,8 +1345,8 @@ function exitSelectMode() {
   selected.clear();
   $("treeTitleText").textContent = "笔记库";
   $("normalActions").style.display = "";
-  $("selectActions").style.display = "none";
-  $("exportBtn").textContent = "📤 导出";
+  $("exportBtn").style.display = "";
+  $("selectBar").style.display = "none";
   renderTree(treeData);
 }
 
@@ -1376,7 +1377,8 @@ function selectAll(invert) {
 }
 
 function updateSelUI() {
-  $("exportBtn").textContent = selectMode ? (selected.size ? `📤 导出所选(${selected.size})` : "📤 导出所选") : "📤 导出";
+  $("selCount").textContent = "已选 " + selected.size + " 项";
+  $("selExportBtn").textContent = selected.size ? `📤 导出所选(${selected.size})` : "📤 导出所选";
   document.querySelectorAll("#tree .sel-cb").forEach((cb) => {
     const it = findSubtree(treeData, cb.dataset.path);
     if (!it) return;
@@ -1537,6 +1539,7 @@ $("exportBtn").addEventListener("click", () => {
 $("selAllBtn").addEventListener("click", () => selectAll(false));
 $("selInvertBtn").addEventListener("click", () => selectAll(true));
 $("selClearBtn").addEventListener("click", exitSelectMode);
+$("selExportBtn").addEventListener("click", exportSelected);
 $("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）
