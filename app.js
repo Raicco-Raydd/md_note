@@ -1787,6 +1787,7 @@ function activateReviewHighlight() {
   });
   const idx = Math.min(...modifiedBlocks);
   gotoBlock(idx);
+  setMsg(`🔍 已高亮 ${reviewBlocks.size} 处未保存修改`);
 }
 
 // ── 备份导出 / 导入 ──────────────────
