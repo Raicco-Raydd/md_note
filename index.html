@@ -643,6 +643,7 @@
   .modal-body input:focus { border-color: var(--accent-dim); }
   .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); }
   .modal-foot button { font-size: 12px; padding: 6px 14px; }
+  #confirmExtra { margin-right: auto; }
   .modal.small { width: 360px; }
   #confirmMsg { font-size: 13px; color: var(--text); line-height: 1.7; margin: 0; }
   /* 未保存文件/修改块高亮 */
@@ -843,6 +844,7 @@
       <p id="confirmMsg"></p>
     </div>
     <div class="modal-foot">
+      <button id="confirmExtra" class="ghost">🔍 查看修改</button>
       <button id="confirmCancel" class="ghost">取消</button>
       <button id="confirmOk" class="primary">确定</button>
     </div>

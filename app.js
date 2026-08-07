@@ -1707,7 +1707,7 @@ async function exportSelected() {
     showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
       if (dirty) await saveNote(true);
       doExportSelected();
-    });
+    }, "🔍 查看修改", jumpToFirstModified);
     return;
   }
   doExportSelected();
@@ -1745,17 +1745,30 @@ async function doExportSelected() {
 
 // ── 通用确认弹窗 ──────────────────────
 let confirmCb = null;
-function showConfirm(msg, okText, onOk) {
+let confirmExtraCb = null;
+function showConfirm(msg, okText, onOk, extraText, onExtra) {
   $("confirmMsg").textContent = msg;
   $("confirmOk").textContent = okText || "确定";
   confirmCb = onOk || null;
+  confirmExtraCb = onExtra || null;
+  const ex = $("confirmExtra");
+  if (extraText && onExtra) { ex.style.display = ""; ex.textContent = extraText; }
+  else ex.style.display = "none";
   $("confirmOverlay").classList.add("show");
 }
-function hideConfirm() { $("confirmOverlay").classList.remove("show"); confirmCb = null; }
+function hideConfirm() { $("confirmOverlay").classList.remove("show"); confirmCb = null; confirmExtraCb = null; }
 $("confirmOk").addEventListener("click", () => { const cb = confirmCb; hideConfirm(); if (cb) cb(); });
 $("confirmCancel").addEventListener("click", hideConfirm);
 $("confirmClose").addEventListener("click", hideConfirm);
+$("confirmExtra").addEventListener("click", () => { const cb = confirmExtraCb; hideConfirm(); if (cb) cb(); });
 $("confirmOverlay").addEventListener("click", (e) => { if (e.target === $("confirmOverlay")) hideConfirm(); });
+
+// 跳到当前笔记第一个未保存的修改块
+function jumpToFirstModified() {
+  if (!modifiedBlocks.size) { setMsg("当前笔记没有未保存的修改块", true); return; }
+  const idx = Math.min(...modifiedBlocks);
+  gotoBlock(idx);
+}
 
 // ── 备份导出 / 导入 ──────────────────
 function findSubtree(items, path) {
@@ -1777,7 +1790,7 @@ async function exportBackup(basePath = "") {
     showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
       if (dirty) await saveNote(true);
       doExport(basePath);
-    });
+    }, "🔍 查看修改", jumpToFirstModified);
     return;
   }
   doExport(basePath);
@@ -1980,7 +1993,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.3.0";
+const APP_VERSION = "4.4.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
