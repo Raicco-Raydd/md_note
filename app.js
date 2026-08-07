@@ -1296,9 +1296,77 @@ $("searchBox").addEventListener("input", (e) => {
   }, 200);
 });
 
+// ── 备份导出 / 导入 ──────────────────
+async function exportBackup() {
+  if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
+  try {
+    const files = [];
+    const walk = async (items, base) => {
+      for (const it of items) {
+        if (it.kind === "dir") {
+          files.push({ path: base + it.name + "/", content: "" });
+          await walk(it.children, base + it.name + "/");
+        } else {
+          const handle = await resolveHandle(it.path);
+          files.push({ path: base + it.name, content: await readFileText(handle) });
+        }
+      }
+    };
+    await walk(treeData, "");
+    const blob = new Blob([MdBackup.zipStore(files)], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const d = new Date(), pad = (n) => String(n).padStart(2, "0");
+    a.href = url;
+    a.download = "minddepot-backup-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setMsg(`📤 已导出 ${files.filter((f) => !f.path.endsWith("/")).length} 个笔记`);
+  } catch (err) {
+    setMsg("导出失败: " + err.message, true);
+  }
+}
+
+async function importBackup() {
+  if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".zip";
+  input.addEventListener("change", async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const files = await MdBackup.parseZip(await file.arrayBuffer());
+      let n = 0;
+      for (const f of files) {
+        // 安全过滤：跳过路径穿越 / 绝对路径条目
+        if (f.path.includes("..") || f.path.startsWith("/") || f.path.includes("\\")) continue;
+        if (f.path.endsWith("/")) continue; // 目录条目：写文件时自动创建
+        const parts = f.path.split("/").filter(Boolean);
+        let dir = vaultRoot;
+        for (let i = 0; i < parts.length - 1; i++) dir = await dir.getDirectoryHandle(parts[i], { create: true });
+        const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+        const w = await fh.createWritable();
+        await w.write(f.content);
+        await w.close();
+        n++;
+      }
+      await refreshTree();
+      setMsg(`📥 已导入 ${n} 个笔记`);
+    } catch (err) {
+      setMsg("导入失败: " + err.message, true);
+    }
+  });
+  input.click();
+}
+
 // ── 事件 ──────────────────────────────
 $("openVaultBtn").addEventListener("click", openVault);
 $("saveBtn").addEventListener("click", saveNote);
+$("exportBtn").addEventListener("click", exportBackup);
+$("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）
 $("newNoteBtn").addEventListener("click", () => showNameModal({

@@ -562,7 +562,7 @@
   <button type="button" id="drawerBtn" class="drawer-btn" title="笔记列表">☰</button>
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
-    <div class="tree-title"><span>笔记库</span><span class="tree-actions"><button id="newFolderBtn" title="新建文件夹">📁</button><button id="newNoteBtn" title="新建笔记">➕</button></span></div>
+    <div class="tree-title"><span>笔记库</span><span class="tree-actions"><button id="exportBtn" title="导出备份（zip）">📤</button><button id="importBtn" title="导入恢复（zip）">📥</button><button id="newFolderBtn" title="新建文件夹">📁</button><button id="newNoteBtn" title="新建笔记">➕</button></span></div>
     <ul class="tree" id="tree"></ul>
   </aside>
 
@@ -650,6 +650,7 @@
 <script src="./marked.min.js"></script>
 <script src="./highlight.min.js"></script>
 <script src="./mdutils.js"></script>
+<script src="./backup.js"></script>
 <script src="./blocks.js"></script>
 <script src="./app.js"></script>
 </body>

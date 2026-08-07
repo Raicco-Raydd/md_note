@@ -13,6 +13,7 @@
 - 💾 **保存**：Ctrl+S，直接写回原文件（FSA）或沙箱（OPFS）
 - 📱 **三位一体**：一套代码跑 PC / 安卓平板手机 / iPhone iPad
 - 🔌 **离线可用**：PWA + Service Worker
+- 📤 **备份/恢复**：一键导出 zip（保留目录结构）+ 导入恢复（兼容标准 zip，含 DEFLATE），OPFS 用户数据安全感
 
 ## 平台能力
 
