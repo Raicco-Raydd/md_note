@@ -463,6 +463,7 @@ document.addEventListener("click", () => ctxMenu.classList.remove("show"));
 // ── 打开 / 编辑 / 保存 ─────────────────
 async function openNote(item, row, opts = {}) {
   try {
+    saveNotePos(); // 离开上一个笔记前记录位置
     const handle = await resolveHandle(item.path);
     const content = await readFileText(handle);
     currentNote = { name: item.name, path: item.path, handle, content };
@@ -485,6 +486,8 @@ async function openNote(item, row, opts = {}) {
       // 搜索状态下点击笔记名：同样定位并高亮搜索对象
       flashToBlock(searchTerm);
       highlightMatchesInBlocks(searchTerm);
+    } else {
+      restoreNotePos(item.path); // 正常打开：回到上次离开的位置
     }
     if (window.matchMedia("(max-width: 768px)").matches) closeDrawer();
   } catch (err) {
@@ -1741,6 +1744,31 @@ function pushRecent(item) {
   saveRecent();
 }
 
+// ── 页面位置记忆（按块索引，localStorage 持久化） ──
+let notePositions = {};
+try { notePositions = JSON.parse(localStorage.getItem("md_note_positions") || "{}"); } catch (e) { /* 忽略 */ }
+
+// 保存当前笔记离开位置：视口顶部第一个可见块的索引
+function saveNotePos() {
+  if (!currentNote || !blockEditor.children.length) return;
+  const st = blockEditor.scrollTop;
+  const els = blockEditor.children;
+  let idx = 0;
+  for (let i = 0; i < els.length; i++) {
+    if (els[i].offsetTop >= st) { idx = Math.max(0, i - 1); break; }
+    idx = i;
+  }
+  notePositions[currentNote.path] = idx;
+  try { localStorage.setItem("md_note_positions", JSON.stringify(notePositions)); } catch (e) { /* 忽略 */ }
+}
+
+// 恢复指定笔记的离开位置
+function restoreNotePos(path) {
+  const idx = notePositions[path];
+  if (idx == null || !blockEditor.children[idx]) return;
+  blockEditor.children[idx].scrollIntoView({ block: "start" });
+}
+
 function renderRecent() {
   const m = $("recentMenu");
   if (!recentNotes.length) {
@@ -1826,6 +1854,9 @@ $("recentBtn").addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#recentMenu") && !e.target.closest("#recentBtn")) $("recentMenu").classList.remove("show");
 });
+
+// 页面关闭/隐藏时保存当前笔记位置
+window.addEventListener("pagehide", saveNotePos);
 
 // ── 笔记大纲导航 ──────────────────────
 const outlineBtn = $("outlineBtn");

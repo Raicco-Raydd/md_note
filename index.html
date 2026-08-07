@@ -284,13 +284,17 @@
   .pane-label::after { content: ""; flex: 1; height: 1px; background: var(--border); }
   /* 笔记大纲导航 */
   .editor-pane { position: relative; }
-  .outline-btn {
+  .editor-tools {
     position: absolute; top: 44px; right: 12px; z-index: 30;
+    display: flex; gap: 6px;
+  }
+  .editor-tools button {
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
     color: var(--text-dim); font-size: 17px; padding: 5px 10px; cursor: pointer;
     box-shadow: var(--shadow);
   }
-  .outline-btn .ol-lbl { font-size: 13px; font-weight: 600; }
+  .editor-tools button:hover { color: var(--accent); border-color: var(--accent-dim); }
+  .editor-tools .lbl { font-size: 13px; font-weight: 600; }
   .outline-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
   .outline-panel {
     position: absolute; top: 80px; right: 10px; z-index: 31;
@@ -622,7 +626,7 @@
     .editor-area { flex-direction: column; }
     .editor-pane { flex: 1 1 45%; }
     .preview-pane { flex: 1 1 55%; border-top: 1px solid var(--border); }
-    .outline-btn .ol-lbl { display: none; } /* 移动端只留图标 */
+    .editor-tools .lbl { display: none; } /* 移动端只留图标 */
     .banner { padding: 6px 36px 6px 12px; font-size: 11px; }
     .edit-overlay { width: 100%; }
     .insert-menu { width: calc(100vw - 28px); }
@@ -653,7 +657,6 @@
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
     <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
-      <button id="recentBtn" title="最近打开的笔记">🕘</button>
       <button id="exportBtn" title="导出备份（zip）">📤</button>
       <button id="sortBtn" title="排序：文件名 · 正序">🔃</button>
       <button id="importBtn" title="导入恢复（zip）">📥</button>
@@ -675,7 +678,10 @@
   <section class="editor-area">
     <div class="editor-pane">
       <input id="noteTitle" placeholder="笔记标题（回车插入标题块）" spellcheck="false" disabled>
-      <button type="button" id="outlineBtn" class="outline-btn" title="笔记大纲">📑<span class="ol-lbl"> 大纲</span></button>
+      <div class="editor-tools">
+        <button type="button" id="recentBtn" title="最近打开的笔记">🕘<span class="lbl"> 最近</span></button>
+        <button type="button" id="outlineBtn" title="笔记大纲">📑<span class="lbl"> 大纲</span></button>
+      </div>
       <div class="outline-panel" id="outlinePanel"></div>
       <div id="blockEditor" class="block-editor"></div>
       <textarea id="editorText" style="display:none" spellcheck="false" disabled></textarea>
