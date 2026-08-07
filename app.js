@@ -304,14 +304,16 @@ function showCtxMenu(e, item) {
   ctxItem = item;
   const html = item.kind === "file"
     ? `<button data-act="open">📖 打开</button>` +
+      `<button data-act="export">📤 导出</button>` +
       `<button data-act="rename">✏️ 重命名</button>` +
       `<button data-act="del" class="del">🗑 删除</button>`
     : `<button data-act="note">➕ 新建笔记</button>` +
       `<button data-act="folder">📁 新建文件夹</button>` +
+      `<button data-act="export">📤 导出文件夹</button>` +
       `<button data-act="rename">✏️ 重命名</button>` +
       `<button data-act="del" class="del">🗑 删除</button>`;
   ctxMenu.innerHTML = html;
-  const mw = 175, mh = item.kind === "dir" ? 190 : 150;
+  const mw = 175, mh = item.kind === "dir" ? 215 : 175;
   ctxMenu.style.left = Math.min(e.clientX, innerWidth - mw - 8) + "px";
   ctxMenu.style.top = Math.min(e.clientY, innerHeight - mh - 8) + "px";
   ctxMenu.classList.add("show");
@@ -338,6 +340,7 @@ ctxMenu.addEventListener("click", (e) => {
     okText: "创建",
     onSubmit: (n) => doCreateFolder(item.path, n),
   });
+  else if (act === "export") exportBackup(item.path);
 });
 
 document.addEventListener("click", () => ctxMenu.classList.remove("show"));
@@ -1297,28 +1300,64 @@ $("searchBox").addEventListener("input", (e) => {
 });
 
 // ── 备份导出 / 导入 ──────────────────
-async function exportBackup() {
+function findSubtree(items, path) {
+  for (const it of items) {
+    if (it.path === path) return it;
+    if (it.kind === "dir" && path.startsWith(it.path)) {
+      const r = findSubtree(it.children, path);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+// 导出：无参 = 全部；传目录 = 该目录 zip；传文件 = 直接下载 .md
+async function exportBackup(basePath = "") {
   if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
   try {
+    let roots = treeData, base = "", exportName = "minddepot-backup";
+    if (basePath) {
+      const node = findSubtree(treeData, basePath);
+      if (!node) { setMsg("导出目标不存在", true); return; }
+      if (node.kind === "file") {
+        // 单文件：直接下载 .md 原文件
+        const handle = await resolveHandle(node.path);
+        const content = await readFileText(handle);
+        const blob = new Blob([content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = node.name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        setMsg("📤 已导出 " + node.name);
+        return;
+      }
+      roots = node.children || [];
+      base = node.path; // zip 内保留文件夹名
+      exportName = node.name;
+    }
     const files = [];
-    const walk = async (items, base) => {
+    const walk = async (items, prefix) => {
       for (const it of items) {
         if (it.kind === "dir") {
-          files.push({ path: base + it.name + "/", content: "" });
-          await walk(it.children, base + it.name + "/");
+          files.push({ path: prefix + it.name + "/", content: "" });
+          await walk(it.children, prefix + it.name + "/");
         } else {
           const handle = await resolveHandle(it.path);
-          files.push({ path: base + it.name, content: await readFileText(handle) });
+          files.push({ path: prefix + it.name, content: await readFileText(handle) });
         }
       }
     };
-    await walk(treeData, "");
+    await walk(roots, base);
     const blob = new Blob([MdBackup.zipStore(files)], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     const d = new Date(), pad = (n) => String(n).padStart(2, "0");
     a.href = url;
-    a.download = "minddepot-backup-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".zip";
+    a.download = exportName + "-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".zip";
     document.body.appendChild(a);
     a.click();
     a.remove();
