@@ -328,6 +328,9 @@ function buildNode(item) {
   }
   row.title = item.path;
 
+  // 未保存文件在树中高亮
+  if (dirtyFiles.has(item.path)) row.classList.add("dirty-file");
+
   // 悬停操作按钮（勾选模式下隐藏，避免误触）
   const acts = document.createElement("span");
   acts.className = "row-actions";
@@ -473,6 +476,8 @@ async function openNote(item, row, opts = {}) {
     $("saveBtn").disabled = false;
     $("editorText").value = content;
     blocks = MdBlocks.parseBlocks(content);
+    blockSnapshots = blocks.map((b) => snapOf(b)); // 打开时快照
+    modifiedBlocks.clear();
     renderBlocks();
     syncTitleFromContent();
     if (activeRow) activeRow.classList.remove("active");
@@ -664,10 +669,20 @@ $("noteTitle").addEventListener("change", () => {
 
 // ── 自动保存（用户可开关，每分钟）+ 保存状态 ──
 let dirty = false;
+const dirtyFiles = new Set(); // 所有未保存的笔记路径（多文件跟踪）
 let autoSaveTimer = null;
 let autoSaveEnabled = true;
 try { autoSaveEnabled = localStorage.getItem("md_note_autosave") !== "0"; } catch (e) { /* 忽略 */ }
 const AUTOSAVE_MS = 60000; // 自动保存周期：每分钟
+
+// 块级变更追踪（未保存文件中修改部分高亮）
+let blockSnapshots = [];    // 打开时的块快照（用于 diff）
+let modifiedBlocks = new Set(); // 被修改过的块索引
+
+function snapOf(b) { return JSON.stringify({ c: b.content, t: b.type, l: b.level, k: b.checked }); }
+function updateTreeDirty() {
+  if (activeRow) activeRow.classList.toggle("dirty-file", dirty);
+}
 
 function setSaveState(s) {
   const el = $("saveState");
@@ -682,16 +697,23 @@ function setSaveState(s) {
 }
 
 function markDirty() {
+  if (currentNote) dirtyFiles.add(currentNote.path);
   dirty = true;
   $("saveBtn").classList.add("dirty");
   $("saveBtn").title = "有未保存的更改";
   setSaveState(autoSaveEnabled ? "dirty" : "autooff");
+  updateTreeDirty();
 }
 function clearDirty() {
+  if (currentNote) dirtyFiles.delete(currentNote.path);
   dirty = false;
   $("saveBtn").classList.remove("dirty");
   $("saveBtn").title = "保存 (Ctrl+S)";
   setSaveState(autoSaveEnabled ? "saved" : "autooff");
+  updateTreeDirty();
+  // 清除块级修改高亮
+  modifiedBlocks.clear();
+  document.querySelectorAll(".block-modified").forEach((el) => el.classList.remove("block-modified"));
 }
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
@@ -1078,6 +1100,7 @@ function phFor(b) {
 function buildBlockEl(b, i) {
   const div = document.createElement("div");
   div.className = "block b-" + b.type + (b.type === "heading" ? " b-h" + (b.level || 1) : "");
+  if (modifiedBlocks.has(i)) div.classList.add("block-modified"); // 未保存的修改块高亮
   div.dataset.idx = i;
 
   const ctrl = document.createElement("span");
@@ -1195,6 +1218,12 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
+  // 块级变更追踪：与打开时快照比对，标记修改块
+  if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
+    modifiedBlocks.add(i);
+    const blk = content.closest(".block");
+    if (blk) blk.classList.add("block-modified");
+  }
   markDirty();
   scheduleAutoSave();
   if (tryShortcut(b, text)) { rerenderBlock(i, 0); return; }
@@ -1402,6 +1431,7 @@ function switchBlockType(i, type, level) {
   const nb = Object.assign(MdBlocks.emptyBlock(type), { content: keep });
   if (type === "heading" && level) nb.level = level;
   blocks[i] = nb;
+  modifiedBlocks.add(i); // 类型切换视为修改
   markDirty(); scheduleAutoSave();
   rerenderBlock(i, 0);
 }
@@ -1673,7 +1703,17 @@ function updateSelUI() {
 
 async function exportSelected() {
   if (!selected.size) { setMsg("请先勾选要导出的笔记", true); return; }
-  if (dirty) await saveNote(true);
+  if (dirtyFiles.size) {
+    showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
+      if (dirty) await saveNote(true);
+      doExportSelected();
+    });
+    return;
+  }
+  doExportSelected();
+}
+
+async function doExportSelected() {
   try {
     const files = [];
     const walk = async (items) => {
@@ -1703,6 +1743,20 @@ async function exportSelected() {
   }
 }
 
+// ── 通用确认弹窗 ──────────────────────
+let confirmCb = null;
+function showConfirm(msg, okText, onOk) {
+  $("confirmMsg").textContent = msg;
+  $("confirmOk").textContent = okText || "确定";
+  confirmCb = onOk || null;
+  $("confirmOverlay").classList.add("show");
+}
+function hideConfirm() { $("confirmOverlay").classList.remove("show"); confirmCb = null; }
+$("confirmOk").addEventListener("click", () => { const cb = confirmCb; hideConfirm(); if (cb) cb(); });
+$("confirmCancel").addEventListener("click", hideConfirm);
+$("confirmClose").addEventListener("click", hideConfirm);
+$("confirmOverlay").addEventListener("click", (e) => { if (e.target === $("confirmOverlay")) hideConfirm(); });
+
 // ── 备份导出 / 导入 ──────────────────
 function findSubtree(items, path) {
   for (const it of items) {
@@ -1718,7 +1772,18 @@ function findSubtree(items, path) {
 // 导出：无参 = 全部；传目录 = 该目录 zip；传文件 = 直接下载 .md
 async function exportBackup(basePath = "") {
   if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
-  if (dirty) await saveNote(true); // 未保存更改先落盘，确保导出最新内容
+  if (dirtyFiles.size) {
+    // 有未保存更改：气泡确认后先落盘再导出
+    showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
+      if (dirty) await saveNote(true);
+      doExport(basePath);
+    });
+    return;
+  }
+  doExport(basePath);
+}
+
+async function doExport(basePath) {
   try {
     let roots = treeData, base = "", exportName = "minddepot-backup";
     if (basePath) {
@@ -1915,7 +1980,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.2.2";
+const APP_VERSION = "4.3.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
