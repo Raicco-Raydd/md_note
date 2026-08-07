@@ -1787,7 +1787,10 @@ function activateReviewHighlight() {
   });
   const idx = Math.min(...modifiedBlocks);
   gotoBlock(idx);
-  setMsg(`🔍 已高亮 ${reviewBlocks.size} 处未保存修改`);
+  const other = dirtyFiles.size - (currentNote && dirtyFiles.has(currentNote.path) ? 1 : 0);
+  setMsg(other > 0
+    ? `🔍 已高亮 ${reviewBlocks.size} 处；还有 ${other} 个文件有未保存修改，打开对应文件后再点查看修改`
+    : `🔍 已高亮 ${reviewBlocks.size} 处未保存修改`);
 }
 
 // ── 备份导出 / 导入 ──────────────────
