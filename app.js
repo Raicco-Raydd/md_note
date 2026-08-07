@@ -123,10 +123,57 @@ async function renderTree(items) {
     filtered = filterTree(items);
   }
   if (!filtered.length) {
+    // 无强匹配：尝试弱匹配推荐（“您是否想要找”）
+    if (searchTerm) {
+      const sugg = suggestSimilar(searchTerm);
+      if (sugg.length) {
+        ul.innerHTML = '<li class="tree-empty">无匹配笔记。💡 是否想找：</li>' +
+          sugg.map((s) => `<li class="search-suggest" data-path="${escapeHtml(s.path)}">📄 ${escapeHtml(s.title || s.name.replace(/\.(md|markdown|txt)$/i, ""))}</li>`).join("");
+        ul.querySelectorAll(".search-suggest").forEach((el) => {
+          el.addEventListener("click", () => {
+            const node = findSubtree(treeData, el.dataset.path);
+            if (node) {
+              searchTerm = "";
+              const sb = $("searchBox");
+              if (sb) sb.value = "";
+              openNote(node, null);
+            }
+          });
+        });
+        return;
+      }
+    }
     ul.innerHTML = '<li class="tree-empty">' + (searchTerm ? "无匹配笔记" : "笔记库为空，点 ➕ 新建") + "</li>";
     return;
   }
   filtered.forEach((item) => ul.appendChild(buildNode(item)));
+}
+
+// 弱匹配：搜索词字符覆盖度（Jaccard 风格），用于无结果时的推荐
+function charCoverage(q, cand) {
+  const sq = new Set(q), sc = new Set(cand);
+  let hit = 0;
+  for (const c of sq) if (sc.has(c)) hit++;
+  return sq.size ? hit / sq.size : 0;
+}
+
+// 候选 = 文件名 + 标题（大文件标题为空则只剩文件名）
+function suggestSimilar(q, limit = 3) {
+  const ql = q.toLowerCase();
+  const cands = [];
+  const walk = (its) => {
+    for (const it of its) {
+      if (it.kind === "file") {
+        const idx = searchIndex && searchIndex.get(it.path);
+        const title = idx && idx.title ? idx.title : "";
+        const score = charCoverage(ql, (it.name + " " + title).toLowerCase());
+        if (score >= 0.5) cands.push({ path: it.path, name: it.name, title, score });
+      } else walk(it.children);
+    }
+  };
+  walk(treeData);
+  cands.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path));
+  return cands.slice(0, limit);
 }
 
 // ── 全文搜索索引 ──────────────────────
