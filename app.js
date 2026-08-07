@@ -1404,7 +1404,7 @@ async function importBackup() {
 // ── 事件 ──────────────────────────────
 $("openVaultBtn").addEventListener("click", openVault);
 $("saveBtn").addEventListener("click", saveNote);
-$("exportBtn").addEventListener("click", exportBackup);
+$("exportBtn").addEventListener("click", () => exportBackup());
 $("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）
