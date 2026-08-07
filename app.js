@@ -1169,6 +1169,13 @@ const THEME_MODES = [
 let themeIdx = 0;
 const themeBtn = $("themeBtn");
 const metaTheme = document.querySelector('meta[name="theme-color"]');
+const themeFav = document.getElementById("themeFavicon");
+
+function syncFavicon(key) {
+  if (!themeFav) return;
+  const light = key === "light" || (key === "auto" && window.matchMedia("(prefers-color-scheme: light)").matches);
+  themeFav.href = light ? "./mdutils_light_theme.png" : "./mdutils_dark_theme.png";
+}
 
 function syncThemeColor(key) {
   if (!metaTheme) return;
@@ -1186,6 +1193,7 @@ function applyTheme(idx, persist) {
   themeBtn.innerHTML = m.icon + '<span class="theme-lbl"> ' + m.label + "</span>";
   themeBtn.title = "主题：" + m.label + "（点击切换）";
   syncThemeColor(m.key);
+  syncFavicon(m.key);
 }
 
 (function themeInit() {
@@ -1197,7 +1205,10 @@ function applyTheme(idx, persist) {
   // 跟随系统模式：系统深浅变化时同步浏览器 UI 颜色
   try {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-      if (THEME_MODES[themeIdx].key === "auto") syncThemeColor("auto");
+      if (THEME_MODES[themeIdx].key === "auto") {
+        syncThemeColor("auto");
+        syncFavicon("auto");
+      }
     });
   } catch (e) { /* 忽略 */ }
 })();

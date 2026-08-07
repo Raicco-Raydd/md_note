@@ -4,12 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0f1115">
+<link rel="icon" type="image/png" id="themeFavicon" href="./mdutils_dark_theme.png">
 <script>
 /* 主题预载：打开/刷新时先应用已保存主题，防止闪烁（FOUC） */
 (function () {
   try {
     var t = localStorage.getItem("md_note_theme");
     if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    var fav = document.getElementById("themeFavicon");
+    if (fav) {
+      var light = t === "light" || (!t && window.matchMedia("(prefers-color-scheme: light)").matches);
+      fav.href = light ? "./mdutils_light_theme.png" : "./mdutils_dark_theme.png";
+    }
   } catch (e) { /* 忽略 */ }
 })();
 </script>
