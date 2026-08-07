@@ -464,6 +464,7 @@ document.addEventListener("click", () => ctxMenu.classList.remove("show"));
 async function openNote(item, row, opts = {}) {
   try {
     saveNotePos(); // 离开上一个笔记前记录位置
+    saveIfDirty(); // 有未保存更改先落盘
     const handle = await resolveHandle(item.path);
     const content = await readFileText(handle);
     currentNote = { name: item.name, path: item.path, handle, content };
@@ -659,7 +660,28 @@ $("noteTitle").addEventListener("change", () => {
   setMsg("✏️ 标题已更新，记得保存");
 });
 
-async function saveNote() {
+// ── 未保存状态 + 防抖自动保存 ────────
+let dirty = false;
+let autoSaveTimer = null;
+function markDirty() {
+  dirty = true;
+  $("saveBtn").classList.add("dirty");
+  $("saveBtn").title = "有未保存的更改";
+}
+function clearDirty() {
+  dirty = false;
+  $("saveBtn").classList.remove("dirty");
+  $("saveBtn").title = "保存 (Ctrl+S)";
+}
+function scheduleAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => saveNote(true), 1500);
+}
+function saveIfDirty() {
+  if (dirty) saveNote(true);
+}
+
+async function saveNote(silent) {
   if (!currentNote) return;
   currentNote.content = MdBlocks.serializeBlocks(blocks);
   $("editorText").value = currentNote.content;
@@ -667,9 +689,10 @@ async function saveNote() {
     const w = await currentNote.handle.createWritable();
     await w.write(currentNote.content);
     await w.close();
-    setMsg(`💾 已保存 ${currentNote.name}`);
+    clearDirty();
+    if (!silent) setMsg(`💾 已保存 ${currentNote.name}`);
   } catch (err) {
-    setMsg("保存失败: " + err.message, true);
+    if (!silent) setMsg("保存失败: " + err.message, true);
   }
 }
 
@@ -748,6 +771,7 @@ async function commitEdit(newText, opts = {}) {
     const w = await currentNote.handle.createWritable();
     await w.write(newText);
     await w.close();
+    clearDirty();
     setMsg(`✓ 已保存 ${currentNote.name}`);
   } catch (err) {
     setMsg("⚠️ 已修改但自动保存失败: " + err.message, true);
@@ -1081,7 +1105,7 @@ function buildBlockEl(b, i) {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = !!b.checked;
-    cb.addEventListener("change", () => { b.checked = cb.checked; });
+    cb.addEventListener("change", () => { b.checked = cb.checked; markDirty(); scheduleAutoSave(); });
     mark.appendChild(cb);
   } else if (b.type === "heading") mark.textContent = "H" + (b.level || 1);
   else if (b.type === "quote") mark.textContent = "❝";
@@ -1133,6 +1157,8 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
+  markDirty();
+  scheduleAutoSave();
   if (tryShortcut(b, text)) { rerenderBlock(i, 0); return; }
   if (i === 0 && b.type === "heading") syncTitleFromContent();
 }
@@ -1176,6 +1202,7 @@ function onBlockKeydown(e, i, content) {
       ? { type: "heading", level: b.level, content: after }
       : Object.assign(MdBlocks.emptyBlock(b.type), { content: after });
     blocks.splice(i + 1, 0, nb);
+    markDirty(); scheduleAutoSave();
     renderBlocks();
     focusBlock(i + 1, 0);
     return;
@@ -1185,6 +1212,7 @@ function onBlockKeydown(e, i, content) {
     hideSlashMenu();
     if (i === 0) { b.type = "paragraph"; rerenderBlock(0, 0); return; }
     blocks.splice(i, 1);
+    markDirty(); scheduleAutoSave();
     renderBlocks();
     focusEnd(i - 1);
   }
@@ -1260,6 +1288,7 @@ function focusEnd(i) {
 
 function insertBlockAfter(i) {
   blocks.splice(i + 1, 0, { type: "paragraph", content: "" });
+  markDirty(); scheduleAutoSave();
   renderBlocks();
   focusBlock(i + 1, 0);
 }
@@ -1272,6 +1301,7 @@ function moveBlock(from, to, before) {
   if (from < to) target = before ? to - 1 : to;      // 向后移：目标索引-1 后落位
   else target = before ? to : to + 1;                // 向前移：索引不变
   blocks.splice(target, 0, b);
+  markDirty(); scheduleAutoSave();
   renderBlocks();
   focusBlock(target, 0);
 }
@@ -1287,8 +1317,9 @@ function clearDropLine() {
 }
 
 function deleteBlock(i) {
-  if (blocks.length <= 1) { blocks = [{ type: "paragraph", content: "" }]; renderBlocks(); return; }
+  if (blocks.length <= 1) { blocks = [{ type: "paragraph", content: "" }]; markDirty(); scheduleAutoSave(); renderBlocks(); return; }
   blocks.splice(i, 1);
+  markDirty(); scheduleAutoSave();
   renderBlocks();
   focusBlock(Math.min(i, blocks.length - 1), 0);
 }
@@ -1333,6 +1364,7 @@ function switchBlockType(i, type, level) {
   const nb = Object.assign(MdBlocks.emptyBlock(type), { content: keep });
   if (type === "heading" && level) nb.level = level;
   blocks[i] = nb;
+  markDirty(); scheduleAutoSave();
   rerenderBlock(i, 0);
 }
 
@@ -1862,8 +1894,8 @@ document.addEventListener("click", (e) => {
   if (!e.target.closest("#recentMenu") && !e.target.closest("#recentBtn")) $("recentMenu").classList.remove("show");
 });
 
-// 页面关闭/隐藏时保存当前笔记位置
-window.addEventListener("pagehide", saveNotePos);
+// 页面关闭/隐藏时保存未落盘的更改与位置
+window.addEventListener("pagehide", () => { saveIfDirty(); saveNotePos(); });
 
 // ── 笔记大纲导航 ──────────────────────
 const outlineBtn = $("outlineBtn");
