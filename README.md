@@ -2,7 +2,7 @@
 
 图形化 Markdown 笔记工具 —— **手机 / iPad / PC 三位一体**，本地优先，数据不出浏览器。
 
-> 代号 MD_Note（MD = Markdown 双关）
+> 代号 MD_Note（MD = Markdown 双关）｜**v1.0.0**（2026-08-07 首个完整版本）
 
 ## 核心特性
 
