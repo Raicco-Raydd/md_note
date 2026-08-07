@@ -47,10 +47,18 @@ ok(matchScore(null, "x") === null, "空索引条目不崩溃");
 
 console.log("== makeSnippet ==");
 const long = "A".repeat(50) + "明月" + "B".repeat(50); // 关键词居中
-const sn = makeSnippet(long, long.indexOf("明月"), "明月");
+const sn = makeSnippet(long, "明月");
 ok(sn.includes("明月"), "摘要包含关键词");
 ok(sn.startsWith("…") && sn.endsWith("…"), "长文截断带省略号");
-ok(makeSnippet("短文本", 0, "短") === "短文本", "短文不截断");
+ok(makeSnippet("短文本", "短") === "短文本", "短文不截断");
+// 密度窗口：三处命中，前两处扎堆、第三处孤立 → 应选扎堆处
+const dense = "X".repeat(30) + "关键词A" + "A".repeat(15) + "关键词A" + "B".repeat(80) + "关键词A" + "C".repeat(30);
+const dsn = makeSnippet(dense, "关键词");
+const dCnt = (dsn.match(/关键词/g) || []).length;
+ok(dCnt >= 2, "多命中选密度窗口（摘要含 ≥2 处命中，实际 " + dCnt + "）");
+ok(!dsn.includes("CCC"), "密度窗口避开孤立命中");
+const single = makeSnippet("前面若干文字，后面出现唯一关键词在中间区域，其余无关内容填充。", "唯一关键词");
+ok(single.includes("唯一关键词"), "单命中显示唯一命中处");
 
 console.log("== filterTree ==");
 const index = new Map([

@@ -140,10 +140,28 @@ function matchScore(entry, q) {
   return null;
 }
 
-function makeSnippet(text, idx, q) {
-  const L = 26, R = 40;
-  const start = Math.max(0, idx - L);
-  const end = Math.min(text.length, idx + q.length + R);
+function makeSnippet(text, q) {
+  // 收集所有命中位置（升序）
+  const lower = text.toLowerCase();
+  const positions = [];
+  let from = 0;
+  while (from < text.length) {
+    const i = lower.indexOf(q, from);
+    if (i < 0) break;
+    positions.push(i);
+    from = i + q.length;
+  }
+  if (!positions.length) return "";
+  // 滑窗选“命中密度最高”的窗口中心（多命中时更代表正文讨论点，避免总截开头）
+  const W = 60;
+  let best = positions[0], bestCnt = 1, l = 0, r = 0;
+  for (let k = 0; k < positions.length; k++) {
+    while (l < k && positions[k] - positions[l] > W) l++;
+    while (r < positions.length && positions[r] - positions[k] <= W) r++;
+    if (r - l > bestCnt) { bestCnt = r - l; best = positions[k]; }
+  }
+  const start = Math.max(0, best - 26);
+  const end = Math.min(text.length, best + q.length + 40);
   let s = text.slice(start, end).replace(/\s+/g, " ").trim();
   if (start > 0) s = "…" + s;
   if (end < text.length) s += "…";
@@ -158,7 +176,7 @@ function filterTree(items) {
       const hit = matchScore(e, searchTerm);
       if (hit) {
         out.push(it);
-        if (hit.where === "text") searchSnippets.set(it.path, makeSnippet(e.text, hit.idx, searchTerm));
+        if (hit.where === "text") searchSnippets.set(it.path, makeSnippet(e.text, searchTerm));
         else if (hit.where === "title") searchSnippets.set(it.path, "标题命中：" + e.title);
         else searchSnippets.set(it.path, "");
       }
