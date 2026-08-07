@@ -1635,6 +1635,7 @@ function updateSelUI() {
 
 async function exportSelected() {
   if (!selected.size) { setMsg("请先勾选要导出的笔记", true); return; }
+  if (dirty) await saveNote(true);
   try {
     const files = [];
     const walk = async (items) => {
@@ -1679,6 +1680,7 @@ function findSubtree(items, path) {
 // 导出：无参 = 全部；传目录 = 该目录 zip；传文件 = 直接下载 .md
 async function exportBackup(basePath = "") {
   if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
+  if (dirty) await saveNote(true); // 未保存更改先落盘，确保导出最新内容
   try {
     let roots = treeData, base = "", exportName = "minddepot-backup";
     if (basePath) {
@@ -1735,6 +1737,7 @@ async function exportBackup(basePath = "") {
 
 async function importBackup() {
   if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
+  if (dirty) await saveNote(true); // 先落盘，避免导入后旧内容覆盖新文件
   const input = document.createElement("input");
   input.type = "file";
   input.accept = ".zip";
@@ -1874,7 +1877,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.1.1";
+const APP_VERSION = "4.1.2";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
