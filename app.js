@@ -669,7 +669,7 @@ const AUTOSAVE_MS = 60000; // 自动保存周期：每分钟
 
 function setSaveState(s) {
   const el = $("saveState");
-  el.className = "save-state" + (s === "saving" ? " saving" : s === "error" ? " error" : "");
+  el.className = "save-state " + s; // autooff | dirty | saving | saved | error
   el.textContent = {
     autooff: "自动保存关闭",
     dirty: "未自动保存",
@@ -1913,7 +1913,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.2.0";
+const APP_VERSION = "4.2.1";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;

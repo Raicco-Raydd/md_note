@@ -168,8 +168,13 @@
   .switch input:checked + .slider { background: var(--accent-dim); }
   .switch input:checked + .slider::before { transform: translateX(16px); background: var(--bg); }
   .save-state { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
-  .save-state.saving { color: var(--accent); font-weight: 600; }
-  .save-state.error { color: var(--err); }
+  .save-state.dirty { color: var(--accent); animation: savePulse 2s ease-in-out infinite; }
+  .save-state.saving { color: var(--accent); font-weight: 600; animation: savePulse 1s ease-in-out infinite; }
+  .save-state.error { color: var(--err); animation: savePulse 1.2s ease-in-out infinite; }
+  @keyframes savePulse {
+    0%, 100% { opacity: 1; text-shadow: 0 0 0 rgba(79,214,190,0); }
+    50% { opacity: .55; text-shadow: 0 0 8px rgba(79,214,190,.45); }
+  }
 
   .banner {
     flex: none;
