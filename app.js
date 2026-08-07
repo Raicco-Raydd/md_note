@@ -1865,11 +1865,20 @@ const outlinePanel = $("outlinePanel");
 function renderOutline() {
   const items = [];
   blocks.forEach((b, i) => { if (b.type === "heading") items.push({ level: b.level || 1, content: b.content || "", idx: i }); });
+  const nav = `<div class="outline-nav">` +
+    `<button type="button" data-nav="prev-ch" title="上一章">⏮ 章</button>` +
+    `<button type="button" data-nav="prev-sec" title="上一节">↑ 节</button>` +
+    `<button type="button" data-nav="next-sec" title="下一节">↓ 节</button>` +
+    `<button type="button" data-nav="next-ch" title="下一章">章 ⏭</button>` +
+    `<input type="number" id="gotoSec" min="1" placeholder="节号">` +
+    `<button type="button" data-nav="goto" title="跳转到第 N 节">跳转</button>` +
+    `</div>`;
   if (!items.length) {
-    outlinePanel.innerHTML = '<div class="outline-empty">此笔记没有标题块</div>';
+    outlinePanel.innerHTML = nav + '<div class="outline-empty">此笔记没有标题块</div>';
+    bindOutlineNav();
     return;
   }
-  outlinePanel.innerHTML = items.map((it) =>
+  outlinePanel.innerHTML = nav + items.map((it) =>
     `<button class="outline-item" data-idx="${it.idx}" style="padding-left:${8 + (it.level - 1) * 14}px">${escapeHtml(it.content) || "(空标题)"}</button>`
   ).join("");
   outlinePanel.querySelectorAll(".outline-item").forEach((btn) => {
@@ -1878,6 +1887,75 @@ function renderOutline() {
       const el = blockEditor.children[idx];
       if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); flashEl(el); }
       outlinePanel.classList.remove("show");
+    });
+  });
+  bindOutlineNav();
+}
+
+// ── 节数跳转 ──────────────────────────
+function headingBlocks() {
+  const hs = [];
+  blocks.forEach((b, i) => { if (b.type === "heading") hs.push({ idx: i, level: b.level || 1 }); });
+  return hs;
+}
+
+// 当前视口顶部附近的标题块在大纲中的位置（-1 = 首个节之前）
+function currentHeadingPos() {
+  const st = blockEditor.scrollTop;
+  const hs = headingBlocks();
+  let pos = -1;
+  for (let k = 0; k < hs.length; k++) {
+    const el = blockEditor.children[hs[k].idx];
+    if (!el || el.offsetTop > st + 40) break;
+    pos = k;
+  }
+  return pos;
+}
+
+function gotoBlock(idx) {
+  const el = blockEditor.children[idx];
+  if (!el) return;
+  el.scrollIntoView({ block: "start", behavior: "smooth" });
+  flashEl(el);
+}
+
+// 上/下一节（offset ±1）
+function navSection(offset) {
+  const hs = headingBlocks();
+  if (!hs.length) return;
+  const cur = currentHeadingPos();
+  const target = Math.max(0, Math.min(hs.length - 1, cur + offset));
+  gotoBlock(hs[target].idx);
+}
+
+// 上/下一章（level 1 标题）
+function navChapter(offset) {
+  const hs = headingBlocks();
+  if (!hs.length) return;
+  const cur = currentHeadingPos();
+  if (offset > 0) {
+    for (let i = cur + 1; i < hs.length; i++) if (hs[i].level === 1) { gotoBlock(hs[i].idx); return; }
+  } else {
+    for (let i = cur - 1; i >= 0; i--) if (hs[i].level === 1) { gotoBlock(hs[i].idx); return; }
+    gotoBlock(hs[0].idx); // 前面没有章：回第一个节
+  }
+}
+
+function bindOutlineNav() {
+  outlinePanel.querySelectorAll("[data-nav]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const act = btn.dataset.nav;
+      if (act === "prev-sec") navSection(-1);
+      else if (act === "next-sec") navSection(1);
+      else if (act === "prev-ch") navChapter(-1);
+      else if (act === "next-ch") navChapter(1);
+      else if (act === "goto") {
+        const n = parseInt(outlinePanel.querySelector("#gotoSec").value, 10);
+        const hs = headingBlocks();
+        if (!isNaN(n) && n >= 1 && n <= hs.length) gotoBlock(hs[n - 1].idx);
+        else setMsg(`⚠️ 节号应在 1-${hs.length} 之间`, true);
+      }
     });
   });
 }

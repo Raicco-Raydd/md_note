@@ -303,6 +303,20 @@
     box-shadow: var(--shadow); padding: 6px; display: none;
   }
   .outline-panel.show { display: block; }
+  .outline-nav {
+    display: flex; gap: 4px; align-items: center;
+    padding: 0 2px 8px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .outline-nav button {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text-dim); font-size: 11px; padding: 3px 6px; cursor: pointer;
+  }
+  .outline-nav button:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg); }
+  .outline-nav input {
+    width: 50px; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 3px 5px; font-size: 11px; outline: none;
+  }
   .outline-item {
     display: block; width: 100%; text-align: left;
     background: none; border: none; color: var(--text);
