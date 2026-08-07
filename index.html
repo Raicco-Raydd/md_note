@@ -653,6 +653,12 @@
   .modal-foot button { font-size: 12px; padding: 6px 14px; }
   #confirmExtra { margin-right: auto; }
   .modal.small { width: 360px; }
+  .tour-modal { width: 430px; max-width: 92vw; }
+  .tour-body .tour-sub { font-size: 13px; color: var(--text-dim); line-height: 1.7; margin: 0 0 10px; }
+  .tour-list { list-style: none; margin: 0; padding: 0; }
+  .tour-list li { font-size: 13px; color: var(--text); line-height: 1.8; padding: 3px 0; border-bottom: 1px dashed var(--border); }
+  .tour-list li:last-child { border-bottom: none; }
+  .tour-list b { color: var(--accent); }
   #confirmMsg { font-size: 13px; color: var(--text); line-height: 1.7; margin: 0; }
   /* 未保存文件/修改块高亮 */
   .tree-row.dirty-file { color: var(--accent); }
@@ -742,7 +748,7 @@
     <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
       <button id="exportBtn" title="导出备份（zip）">📤</button>
       <button id="sortBtn" title="排序：文件名 · 正序">🔃</button>
-      <button id="importBtn" title="导入恢复（zip）">📥</button>
+      <button id="importBtn" title="导入恢复（zip）">📥</button><button id="importFileBtn" title="导入 .md/.txt 文件">📄</button>
       <button id="newFolderBtn" title="新建文件夹">📁</button>
       <button id="newNoteBtn" title="新建笔记">➕</button>
     </span></div>
@@ -867,6 +873,27 @@
   </div>
 </div>
 
+<!-- 首次使用引导 -->
+<div class="overlay" id="tourOverlay">
+  <div class="modal tour-modal">
+    <div class="modal-head"><span>👋 欢迎使用 MindDepot Note</span></div>
+    <div class="modal-body tour-body">
+      <p class="tour-sub">本地优先的图形化 Markdown 笔记工具，手机 / iPad / PC 三位一体，数据不出浏览器。</p>
+      <ul class="tour-list">
+        <li>📂 <b>打开笔记库</b>：选择真实文件夹（PC/安卓）或浏览器私有存储（iOS）</li>
+        <li>✏️ <b>块编辑</b>：输入 / 选类型，Aa 切换，⠿ 拖拽排序</li>
+        <li>🔍 <b>搜索</b>：多关键词 + 弱匹配推荐，点击直达</li>
+        <li>📑 <b>大纲导航</b>：标题跳转、上下章节、节号直达</li>
+        <li>💾 <b>自动保存</b>：每分钟落盘，开关随你；导出前可查看修改</li>
+        <li>🎨 <b>主题</b>：日间 / 夜间 / 跟随系统</li>
+      </ul>
+    </div>
+    <div class="modal-foot">
+      <button id="tourOk" class="primary">开始使用 →</button>
+    </div>
+  </div>
+</div>
+
 <!-- 右键菜单 -->
 <div id="ctxMenu"></div>
 
@@ -885,11 +912,11 @@
 <div id="slashMenu" class="pop-menu"></div>
 <div id="blockMenu" class="pop-menu"></div>
 
-<script src="./marked.min.js?v=4.10.0"></script>
-<script src="./highlight.min.js?v=4.10.0"></script>
-<script src="./mdutils.js?v=4.10.0"></script>
-<script src="./backup.js?v=4.10.0"></script>
-<script src="./blocks.js?v=4.10.0"></script>
-<script src="./app.js?v=4.10.0"></script>
+<script src="./marked.min.js?v=4.11.0"></script>
+<script src="./highlight.min.js?v=4.11.0"></script>
+<script src="./mdutils.js?v=4.11.0"></script>
+<script src="./backup.js?v=4.11.0"></script>
+<script src="./blocks.js?v=4.11.0"></script>
+<script src="./app.js?v=4.11.0"></script>
 </body>
 </html>

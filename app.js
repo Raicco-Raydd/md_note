@@ -2019,7 +2019,50 @@ function sortTreeData() {
   renderTree(treeData);
 }
 
-// ── 事件 ──────────────────────────────
+// ── 首次使用引导 ──────────────────────
+try {
+  if (!localStorage.getItem("md_note_tour_done")) $("tourOverlay").classList.add("show");
+} catch (e) { /* 忽略 */ }
+$("tourOk").addEventListener("click", () => {
+  $("tourOverlay").classList.remove("show");
+  try { localStorage.setItem("md_note_tour_done", "1"); } catch (e) { /* 忽略 */ }
+});
+
+// ── 导入单个 .md / .txt 文件（重名自动加序号） ──
+async function importFiles() {
+  if (!vaultRoot) { setMsg("请先打开笔记库", true); return; }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".md,.markdown,.txt";
+  input.multiple = true;
+  input.addEventListener("change", async () => {
+    const files = [...(input.files || [])];
+    if (!files.length) return;
+    let n = 0, skipped = 0;
+    for (const f of files) {
+      const safe = f.name.replace(/[\\/:*?"<>|]/g, "_").trim();
+      if (!safe) { skipped++; continue; }
+      const m = safe.match(/\.(md|markdown|txt)$/i);
+      const base = m ? safe.slice(0, -m[0].length) : safe;
+      const ext = m ? m[0] : ".md";
+      // 重名自动加序号：name.md → name(1).md
+      let final = base + ext, k = 1;
+      while (await fileExists(vaultRoot, final)) { final = base + "(" + k + ")" + ext; k++; }
+      const fh = await vaultRoot.getFileHandle(final, { create: true });
+      const w = await fh.createWritable();
+      await w.write(await f.text());
+      await w.close();
+      n++;
+    }
+    await refreshTree();
+    setMsg(n ? `📄 已导入 ${n} 个文件${skipped ? `（跳过 ${skipped} 个）` : ""}` : "⚠️ 没有可导入的文件", n === 0);
+  });
+  input.click();
+}
+async function fileExists(dir, name) {
+  try { await dir.getFileHandle(name); return true; } catch (e) { return false; }
+}
+$("importFileBtn").addEventListener("click", importFiles);
 $("openVaultBtn").addEventListener("click", openVault);
 $("saveBtn").addEventListener("click", saveNote);
 $("exportBtn").addEventListener("click", () => {
@@ -2055,7 +2098,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.10.0";
+const APP_VERSION = "4.11.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
