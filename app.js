@@ -477,6 +477,7 @@ async function openNote(item, row, opts = {}) {
     activeRow = row || null;
     if (activeRow) activeRow.classList.add("active");
     setMsg(`📄 ${item.path}`);
+    pushRecent(item);
     if (opts.scrollTo) {
       flashToBlock(opts.scrollTo);
       highlightMatchesInBlocks(opts.scrollTo); // 搜索对象文本高亮
@@ -1730,6 +1731,35 @@ async function importBackup() {
   input.click();
 }
 
+// ── 最近笔记（localStorage 持久化，最多 10 条） ──
+let recentNotes = [];
+try { recentNotes = JSON.parse(localStorage.getItem("md_note_recent") || "[]"); } catch (e) { /* 忽略 */ }
+function saveRecent() { try { localStorage.setItem("md_note_recent", JSON.stringify(recentNotes.slice(0, 10))); } catch (e) { /* 忽略 */ } }
+function pushRecent(item) {
+  recentNotes = recentNotes.filter((r) => r.path !== item.path);
+  recentNotes.unshift({ path: item.path, name: item.name });
+  saveRecent();
+}
+
+function renderRecent() {
+  const m = $("recentMenu");
+  if (!recentNotes.length) {
+    m.innerHTML = '<div class="pop-title">最近打开</div><div class="pop-empty">还没有打开过笔记</div>';
+    return;
+  }
+  m.innerHTML = `<div class="pop-title">最近打开</div>` + recentNotes.map((r) =>
+    `<button data-path="${escapeHtml(r.path)}">📄 ${escapeHtml(r.name)}</button>`
+  ).join("");
+  m.querySelectorAll("button[data-path]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const node = findSubtree(treeData, btn.dataset.path);
+      m.classList.remove("show");
+      if (node) openNote(node, null);
+      else setMsg("⚠️ 笔记已被移动或删除", true);
+    });
+  });
+}
+
 // ── 排序菜单 ──────────────────────────
 function refreshSortBtn() {
   const desc = { name: "文件名", time: "修改时间" }[sortMode];
@@ -1782,6 +1812,20 @@ $("sortMenu").addEventListener("click", (e) => {
 });
 document.addEventListener("click", () => $("sortMenu").classList.remove("show"));
 refreshSortBtn(); // 启动时同步排序按钮状态
+
+// 最近笔记菜单交互
+$("recentBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  renderRecent();
+  const r = $("recentBtn").getBoundingClientRect();
+  const m = $("recentMenu");
+  m.style.left = Math.min(r.left, innerWidth - 200) + "px";
+  m.style.top = r.bottom + 6 + "px";
+  m.classList.toggle("show");
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#recentMenu") && !e.target.closest("#recentBtn")) $("recentMenu").classList.remove("show");
+});
 
 // ── 笔记大纲导航 ──────────────────────
 const outlineBtn = $("outlineBtn");
