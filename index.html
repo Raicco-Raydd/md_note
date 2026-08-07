@@ -274,6 +274,15 @@
     60%  { background: rgba(79,214,190,.18); }
     100% { background: transparent; box-shadow: none; }
   }
+  /* 搜索对象高亮：命中词文本标记，1.5s 淡出 */
+  mark.search-hl {
+    background: rgba(79,214,190,.35);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+    transition: background 1.5s ease;
+  }
+  mark.search-hl.fade { background: transparent; }
   .block .b-mark {
     flex: none; width: 24px; text-align: center;
     color: var(--text-dim); user-select: none;

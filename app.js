@@ -361,10 +361,7 @@ async function openNote(item, row, opts = {}) {
     setMsg(`📄 ${item.path}`);
     if (opts.scrollTo) {
       flashToBlock(opts.scrollTo);
-    } else {
-      // 笔记页打开反馈：高亮第一个标题块（无标题则第一个块）
-      const first = document.querySelector("#blockEditor .block.b-heading") || document.querySelector("#blockEditor .block");
-      flashEl(first);
+      highlightMatchesInBlocks(opts.scrollTo); // 搜索对象文本高亮
     }
     if (window.matchMedia("(max-width: 768px)").matches) closeDrawer();
   } catch (err) {
@@ -400,6 +397,45 @@ function flashToBlock(q) {
       return;
     }
   }
+}
+
+// 搜索对象高亮：笔记页内所有匹配文本包 <mark>，1.5s 后淡出、再还原为纯文本
+function highlightMatchesInBlocks(q) {
+  if (!q) return;
+  const ql = q.toLowerCase();
+  const contents = document.querySelectorAll("#blockEditor .block .b-content");
+  const targets = [];
+  contents.forEach((el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      if (walker.currentNode.textContent.toLowerCase().includes(ql)) targets.push(walker.currentNode);
+    }
+  });
+  if (!targets.length) return;
+  targets.forEach((node) => {
+    const text = node.textContent;
+    const lower = text.toLowerCase();
+    const frag = document.createDocumentFragment();
+    let pos = 0;
+    while (pos < text.length) {
+      const i = lower.indexOf(ql, pos);
+      if (i < 0) { frag.appendChild(document.createTextNode(text.slice(pos))); break; }
+      if (i > pos) frag.appendChild(document.createTextNode(text.slice(pos, i)));
+      const m = document.createElement("mark");
+      m.className = "search-hl";
+      m.textContent = text.slice(i, i + ql.length);
+      frag.appendChild(m);
+      pos = i + ql.length;
+    }
+    node.replaceWith(frag);
+  });
+  // 1.5s 后淡出，再还原纯文本（mark 不残留，避免干扰后续编辑）
+  setTimeout(() => {
+    document.querySelectorAll("#blockEditor mark.search-hl").forEach((m) => m.classList.add("fade"));
+  }, 1500);
+  setTimeout(() => {
+    document.querySelectorAll("#blockEditor mark.search-hl").forEach((m) => m.replaceWith(document.createTextNode(m.textContent)));
+  }, 3000);
 }
 
 function syncTitleFromContent() {
