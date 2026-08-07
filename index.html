@@ -108,6 +108,7 @@
   }
   .brand { font-weight: 700; font-size: 15px; white-space: nowrap; }
   .brand span { color: var(--accent); font-weight: 400; font-size: 12px; margin-left: 2px; }
+  .brand .ver { font-weight: 700; margin-left: 4px; }
   .vault-name {
     max-width: 220px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -628,6 +629,7 @@
   @media (max-width: 768px) {
     header { gap: 8px; padding: 8px 10px; }
     .brand span { display: none; }
+    .brand span#verBadge { display: inline; } /* 移动端保留版本号 */
     .vault-name { max-width: 130px; }
     .msg { display: none; }
     .theme-lbl { display: none; }
@@ -667,7 +669,7 @@
 <body>
 
 <header>
-  <div class="brand">🦊 MindDepot<span>Note</span></div>
+  <div class="brand">🦊 MindDepot<span>Note</span> <span class="ver" id="verBadge"></span></div>
   <span class="vault-name" id="vaultName" title="未打开笔记库">未打开笔记库</span>
   <div class="spacer"></div>
   <input id="searchBox" placeholder="🔍 搜索笔记…" spellcheck="false">
@@ -687,7 +689,7 @@
   <button type="button" id="drawerBtn" class="drawer-btn" title="笔记列表">☰</button>
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
-    <div class="tree-title"><span class="ver" id="verBadge"></span><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
+    <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
       <button id="exportBtn" title="导出备份（zip）">📤</button>
       <button id="sortBtn" title="排序：文件名 · 正序">🔃</button>
       <button id="importBtn" title="导入恢复（zip）">📥</button>
