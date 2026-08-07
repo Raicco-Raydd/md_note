@@ -911,6 +911,7 @@ document.addEventListener("click", (e) => {
 const blockEditor = $("blockEditor");
 const slashMenu = $("slashMenu");
 let activeBlock = null;
+let dragIdx = -1; // 拖拽排序中的块索引
 
 function phFor(b) {
   switch (b.type) {
@@ -930,6 +931,29 @@ function buildBlockEl(b, i) {
 
   const ctrl = document.createElement("span");
   ctrl.className = "b-controls";
+  // 拖拽排序把手
+  const dragBtn = document.createElement("span");
+  dragBtn.className = "b-drag";
+  dragBtn.textContent = "⠿";
+  dragBtn.title = "拖动排序";
+  dragBtn.draggable = true;
+  dragBtn.addEventListener("dragstart", (e) => {
+    e.stopPropagation();
+    dragIdx = i;
+    div.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", String(i)); } catch (err) { /* 忽略 */ }
+  });
+  dragBtn.addEventListener("dragend", () => {
+    div.classList.remove("dragging");
+    clearDropLine();
+    dragIdx = -1;
+  });
+  // 块类型切换
+  const typeBtn = document.createElement("button");
+  typeBtn.textContent = "Aa";
+  typeBtn.title = "切换块类型";
+  typeBtn.addEventListener("click", (e) => { e.stopPropagation(); fillTypeMenu(i, typeBtn); });
   const addBtn = document.createElement("button");
   addBtn.textContent = "＋";
   addBtn.title = "在此后添加块";
@@ -939,8 +963,25 @@ function buildBlockEl(b, i) {
   delBtn.className = "del";
   delBtn.title = "删除此块";
   delBtn.addEventListener("click", (e) => { e.stopPropagation(); deleteBlock(i); });
-  ctrl.append(addBtn, delBtn);
+  ctrl.append(dragBtn, typeBtn, addBtn, delBtn);
   div.appendChild(ctrl);
+
+  // 拖拽放置：在目标块上/下半区显示插入线
+  div.addEventListener("dragover", (e) => {
+    if (dragIdx < 0 || dragIdx === i) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const r = div.getBoundingClientRect();
+    showDropLine(div, e.clientY < r.top + r.height / 2);
+  });
+  div.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (dragIdx < 0 || dragIdx === i) { clearDropLine(); return; }
+    const r = div.getBoundingClientRect();
+    moveBlock(dragIdx, i, e.clientY < r.top + r.height / 2);
+    clearDropLine();
+    dragIdx = -1;
+  });
 
   const mark = document.createElement("span");
   mark.className = "b-mark";
@@ -1134,6 +1175,28 @@ function insertBlockAfter(i) {
   focusBlock(i + 1, 0);
 }
 
+// ── 拖拽排序 ──────────────────────────
+function moveBlock(from, to, before) {
+  if (from < 0 || from >= blocks.length || to < 0 || to >= blocks.length || from === to) return;
+  const [b] = blocks.splice(from, 1);
+  let target;
+  if (from < to) target = before ? to - 1 : to;      // 向后移：目标索引-1 后落位
+  else target = before ? to : to + 1;                // 向前移：索引不变
+  blocks.splice(target, 0, b);
+  renderBlocks();
+  focusBlock(target, 0);
+}
+
+function showDropLine(div, before) {
+  clearDropLine();
+  const line = document.createElement("div");
+  line.className = "drop-line" + (before ? "" : " after");
+  div.appendChild(line);
+}
+function clearDropLine() {
+  document.querySelectorAll(".drop-line").forEach((l) => l.remove());
+}
+
 function deleteBlock(i) {
   if (blocks.length <= 1) { blocks = [{ type: "paragraph", content: "" }]; renderBlocks(); return; }
   blocks.splice(i, 1);
@@ -1143,13 +1206,45 @@ function deleteBlock(i) {
 
 // / 菜单
 function showSlashMenu(i, content) {
-  const r = content.getBoundingClientRect();
-  slashMenu.innerHTML = `<div class="pop-title">块类型</div>` +
-    Object.keys(MdBlocks.TYPE_LABELS).map((t) => `<button data-t="${t}">${MdBlocks.TYPE_LABELS[t]}</button>`).join("");
+  fillTypeMenu(i, content);
+}
+
+// ── 块类型切换菜单（Aa 按钮 / 斜杠共用） ──
+const TYPE_ITEMS = [
+  { t: "heading", level: 1, label: "H1 主标题" },
+  { t: "heading", level: 2, label: "H2 副标题" },
+  { t: "heading", level: 3, label: "H3 三级标题" },
+  { t: "paragraph", label: "正文" },
+  { t: "bullet", label: "• 无序列表" },
+  { t: "ordered", label: "1. 有序列表" },
+  { t: "todo", label: "☑ 待办事项" },
+  { t: "quote", label: "❝ 引用" },
+  { t: "code", label: "{ } 代码块" },
+  { t: "divider", label: "— 分割线" },
+];
+
+function fillTypeMenu(i, anchor) {
+  const b = blocks[i];
+  slashMenu.innerHTML = `<div class="pop-title">块类型</div>` + TYPE_ITEMS.map((it) => {
+    const active = b && b.type === it.t && (!it.level || b.level === it.level);
+    return `<button data-t="${it.t}"${it.level ? ` data-level="${it.level}"` : ""}${active ? " class=\"active\"" : ""}>${it.label}</button>`;
+  }).join("");
   slashMenu.dataset.idx = i;
+  const r = anchor.getBoundingClientRect();
   slashMenu.style.left = Math.min(r.left, innerWidth - 190) + "px";
-  slashMenu.style.top = Math.min(r.bottom + 4, innerHeight - 280) + "px";
+  slashMenu.style.top = Math.min(r.bottom + 4, innerHeight - 320) + "px";
   slashMenu.classList.add("show");
+}
+
+// 切换块类型并保留原内容（分割线除外）
+function switchBlockType(i, type, level) {
+  const b = blocks[i];
+  if (!b) return;
+  const keep = type === "divider" ? "" : (b.content || "");
+  const nb = Object.assign(MdBlocks.emptyBlock(type), { content: keep });
+  if (type === "heading" && level) nb.level = level;
+  blocks[i] = nb;
+  rerenderBlock(i, 0);
 }
 
 function hideSlashMenu() { slashMenu.classList.remove("show"); }
@@ -1158,10 +1253,7 @@ slashMenu.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-t]");
   if (!b) return;
   const i = parseInt(slashMenu.dataset.idx, 10);
-  if (blocks[i]) {
-    blocks[i] = MdBlocks.emptyBlock(b.dataset.t);
-    rerenderBlock(i, 0);
-  }
+  if (blocks[i]) switchBlockType(i, b.dataset.t, b.dataset.level ? parseInt(b.dataset.level, 10) : undefined);
   hideSlashMenu();
 });
 

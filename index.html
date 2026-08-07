@@ -366,6 +366,21 @@
   }
   .b-controls button:hover { color: var(--accent); background: var(--bg); }
   .b-controls button.del:hover { color: var(--err); }
+  /* 拖拽排序：把手 + 拖动态 + 插入线 */
+  .b-drag {
+    cursor: grab; color: var(--text-dim); font-size: 11px;
+    user-select: none; opacity: 0; transition: opacity .12s;
+    padding: 0 2px; line-height: 1.2;
+  }
+  .block:hover .b-drag { opacity: .6; }
+  .b-drag:active { cursor: grabbing; }
+  .block.dragging { opacity: .45; }
+  .drop-line {
+    position: absolute; left: 0; right: 0; height: 2px;
+    background: var(--accent); border-radius: 1px;
+    pointer-events: none; z-index: 5; top: -1px;
+  }
+  .drop-line.after { top: auto; bottom: -1px; }
 
   /* 弹出菜单（/ 菜单、块菜单） */
   .pop-menu {
@@ -389,6 +404,7 @@
     text-align: left; padding: 6px 10px; cursor: pointer;
   }
   .pop-menu button:hover { background: var(--bg); color: var(--accent); }
+  .pop-menu button.active { color: var(--accent); font-weight: 600; }
   .pop-menu .pop-title {
     font-size: 11px; color: var(--text-dim);
     padding: 4px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px;
