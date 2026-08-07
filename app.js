@@ -1206,6 +1206,21 @@ function buildBlockEl(b, i) {
 function renderBlocks() {
   blockEditor.innerHTML = "";
   blocks.forEach((b, i) => blockEditor.appendChild(buildBlockEl(b, i)));
+  updateStats();
+}
+
+// 笔记统计：字数 / 区块 / 标题 / 待办
+let statsTimer = null;
+function updateStats() {
+  const el = $("noteStats");
+  if (!el) return;
+  if (!currentNote || !blocks.length) { el.textContent = ""; return; }
+  const text = blocks.map((b) => b.content || "").join("");
+  const chars = text.replace(/\s/g, "").length;
+  const headings = blocks.filter((b) => b.type === "heading").length;
+  const todos = blocks.filter((b) => b.type === "todo").length;
+  const done = blocks.filter((b) => b.type === "todo" && b.checked).length;
+  el.textContent = `📝 ${chars} 字 · ${blocks.length} 区块 · ${headings} 标题` + (todos ? ` · ☑ ${done}/${todos}` : "");
 }
 
 // 行内富文本 DOM → markdown（保存/输入时读取）
@@ -1245,6 +1260,8 @@ function onBlockInput(i, content) {
   }
   markDirty();
   scheduleAutoSave();
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(updateStats, 400); // 输入防抖更新统计
   if (tryShortcut(b, text)) { rerenderBlock(i, 0); return; }
   if (i === 0 && b.type === "heading") syncTitleFromContent();
 }
@@ -2038,7 +2055,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.9.0";
+const APP_VERSION = "4.10.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
