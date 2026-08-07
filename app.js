@@ -160,8 +160,12 @@ function makeSnippet(text, q) {
     while (r < positions.length && positions[r] - positions[k] <= W) r++;
     if (r - l > bestCnt) { bestCnt = r - l; best = positions[k]; }
   }
-  const start = Math.max(0, best - 26);
-  const end = Math.min(text.length, best + q.length + 40);
+  // 窗口对齐到行边界：关键词在行首时从该行行首开始，且不越过该行行尾
+  const lineStart = text.lastIndexOf("\n", best) + 1;
+  let start = (best - lineStart <= 80) ? lineStart : Math.max(lineStart, best - 26);
+  let end = Math.min(text.length, best + q.length + 40);
+  const lineEnd = text.indexOf("\n", best);
+  if (lineEnd >= 0 && lineEnd - best <= 120) end = Math.min(end, lineEnd);
   let s = text.slice(start, end).replace(/\s+/g, " ").trim();
   if (start > 0) s = "…" + s;
   if (end < text.length) s += "…";
@@ -248,13 +252,18 @@ function buildNode(item) {
 
   li.appendChild(row);
 
-  // 搜索结果摘要（全文命中时显示上下文片段）
+  // 搜索结果摘要（全文命中时显示上下文片段；点击跳转到文内位置并高亮）
   if (item.kind === "file" && searchTerm) {
     const snip = searchSnippets.get(item.path);
     if (snip) {
       const div = document.createElement("div");
       div.className = "search-snippet";
       div.innerHTML = escapeHtml(snip).replace(new RegExp(escapeReg(searchTerm), "gi"), (m) => "<mark>" + m + "</mark>");
+      div.title = "点击跳转到命中位置";
+      div.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openNote(item, findRow(item.path), { scrollTo: searchTerm });
+      });
       li.appendChild(div);
     }
   }
@@ -334,7 +343,7 @@ ctxMenu.addEventListener("click", (e) => {
 document.addEventListener("click", () => ctxMenu.classList.remove("show"));
 
 // ── 打开 / 编辑 / 保存 ─────────────────
-async function openNote(item, row) {
+async function openNote(item, row, opts = {}) {
   try {
     const handle = await resolveHandle(item.path);
     const content = await readFileText(handle);
@@ -350,9 +359,26 @@ async function openNote(item, row) {
     activeRow = row || null;
     if (activeRow) activeRow.classList.add("active");
     setMsg(`📄 ${item.path}`);
+    if (opts.scrollTo) flashToBlock(opts.scrollTo);
     if (window.matchMedia("(max-width: 768px)").matches) closeDrawer();
   } catch (err) {
     setMsg("打开失败: " + err.message, true);
+  }
+}
+
+// 从搜索结果跳转：滚动到包含关键词的块并高亮淡出
+function flashToBlock(q) {
+  if (!q) return;
+  const ql = q.toLowerCase();
+  const els = document.querySelectorAll("#blockEditor .block");
+  for (const el of els) {
+    if (el.textContent.toLowerCase().includes(ql)) {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.classList.remove("flash-hl");
+      void el.offsetWidth; // 重置动画
+      el.classList.add("flash-hl");
+      return;
+    }
   }
 }
 

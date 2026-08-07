@@ -268,6 +268,12 @@
     border-radius: 4px;
   }
   .block:hover { background: var(--hover-bg); }
+  .block.flash-hl { animation: flashHl 2.4s ease-out; }
+  @keyframes flashHl {
+    0%   { background: rgba(79,214,190,.38); box-shadow: inset 3px 0 0 var(--accent); border-radius: 4px; }
+    60%  { background: rgba(79,214,190,.18); }
+    100% { background: transparent; box-shadow: none; }
+  }
   .block .b-mark {
     flex: none; width: 24px; text-align: center;
     color: var(--text-dim); user-select: none;

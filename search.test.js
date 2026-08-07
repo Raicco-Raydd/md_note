@@ -46,11 +46,17 @@ ok(matchScore({ name: "d.md", title: "", text: "无相关内容" }, "不存在")
 ok(matchScore(null, "x") === null, "空索引条目不崩溃");
 
 console.log("== makeSnippet ==");
-const long = "A".repeat(50) + "明月" + "B".repeat(50); // 关键词居中
+const long = "A\n".repeat(30) + "明月" + "\nB\n".repeat(30); // 关键词居中，多行文本
 const sn = makeSnippet(long, "明月");
 ok(sn.includes("明月"), "摘要包含关键词");
 ok(sn.startsWith("…") && sn.endsWith("…"), "长文截断带省略号");
 ok(makeSnippet("短文本", "短") === "短文本", "短文不截断");
+// 行对齐：关键词在行首时，摘要从该行行首开始，不带出上一行内容
+const lineAligned = "上一行联合全域作战的内容\n- 灰色地带竞争：在冲突门槛以下进行认知战、经济战、科技战。\n下一行内容";
+const las = makeSnippet(lineAligned, "灰色地带");
+ok(las.includes("灰色地带竞争"), "摘要含关键词行");
+ok(!las.includes("联合全域"), "行对齐：不带出上一行内容");
+ok(!las.includes("下一行"), "行对齐：不带出下一行内容");
 // 密度窗口：三处命中，前两处扎堆、第三处孤立 → 应选扎堆处
 const dense = "X".repeat(30) + "关键词A" + "A".repeat(15) + "关键词A" + "B".repeat(80) + "关键词A" + "C".repeat(30);
 const dsn = makeSnippet(dense, "关键词");
