@@ -15,6 +15,28 @@ let searchIndex = null;        // 全文搜索索引：Map<path, {name, title, t
 let searchSnippets = new Map(); // 搜索结果摘要：Map<path, snippet>
 let selectMode = false;        // 批量选择模式（导出勾选）
 let selected = new Set();      // 已勾选的笔记路径
+// 排序配置（localStorage 持久化）
+let sortMode = "name";        // "name" | "time"
+let sortDir = "asc";          // "asc" | "desc"
+try {
+  const s = localStorage.getItem("md_note_sort") || "name-asc";
+  const [m, d] = s.split("-");
+  if (m === "name" || m === "time") sortMode = m;
+  if (d === "asc" || d === "desc") sortDir = d;
+} catch (e) { /* 忽略 */ }
+function saveSort() { try { localStorage.setItem("md_note_sort", sortMode + "-" + sortDir); } catch (e) { /* 忽略 */ } }
+
+// 排序比较器：目录始终在前，组内按配置排序
+function sortItems(a, b) {
+  if (a.kind !== b.kind) return a.kind === "dir" ? -1 : 1;
+  if (sortMode === "time") {
+    const d = sortDir === "asc" ? a.mtime - b.mtime : b.mtime - a.mtime;
+    if (d !== 0) return d;
+    return a.name.localeCompare(b.name, "zh-CN"); // 时间相同按名称
+  }
+  const n = a.name.localeCompare(b.name, "zh-CN");
+  return sortDir === "asc" ? n : -n;
+}
 let currentNote = null;  // {name, path, handle, content}
 let activeRow = null;
 let blocks = [];          // 块编辑器状态
@@ -60,10 +82,12 @@ async function walkDir(dir, path) {
     if (handle.kind === "directory") {
       items.push({ kind: "dir", name, path: path + name + "/", children: await walkDir(handle, path + name + "/") });
     } else if (/\.(md|markdown|txt)$/i.test(name)) {
-      items.push({ kind: "file", name, path: path + name });
+      let mtime = 0;
+      try { mtime = (await handle.getFile()).lastModified; } catch (e) { /* 忽略 */ }
+      items.push({ kind: "file", name, path: path + name, mtime });
     }
   }
-  items.sort((a, b) => a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "dir" ? -1 : 1);
+  items.sort(sortItems);
   return items;
 }
 
@@ -1529,6 +1553,24 @@ async function importBackup() {
   input.click();
 }
 
+// ── 排序菜单 ──────────────────────────
+function refreshSortBtn() {
+  const desc = { name: "文件名", time: "修改时间" }[sortMode];
+  const dir = sortDir === "asc" ? (sortMode === "name" ? "正序" : "最旧在前") : (sortMode === "name" ? "逆序" : "最新在前");
+  $("sortBtn").title = `排序：${desc} · ${dir}`;
+  $("sortBtn").textContent = sortMode === "time" ? (sortDir === "asc" ? "🕐" : "🕓") : (sortDir === "asc" ? "🔃" : "🔀");
+}
+
+// 仅重排现有 treeData（不重新走目录，快）
+function sortTreeData() {
+  const sortRec = (items) => {
+    items.sort(sortItems);
+    items.forEach((it) => { if (it.kind === "dir") sortRec(it.children); });
+  };
+  sortRec(treeData);
+  renderTree(treeData);
+}
+
 // ── 事件 ──────────────────────────────
 $("openVaultBtn").addEventListener("click", openVault);
 $("saveBtn").addEventListener("click", saveNote);
@@ -1540,6 +1582,29 @@ $("selAllBtn").addEventListener("click", () => selectAll(false));
 $("selInvertBtn").addEventListener("click", () => selectAll(true));
 $("selClearBtn").addEventListener("click", exitSelectMode);
 $("selExportBtn").addEventListener("click", exportSelected);
+$("sortBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  const r = $("sortBtn").getBoundingClientRect();
+  const m = $("sortMenu");
+  m.style.left = Math.min(r.left, innerWidth - 190) + "px";
+  m.style.top = r.bottom + 6 + "px";
+  m.classList.toggle("show");
+  m.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.sort === sortMode + "-" + sortDir);
+  });
+});
+$("sortMenu").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-sort]");
+  if (!b) return;
+  const [m, d] = b.dataset.sort.split("-");
+  sortMode = m; sortDir = d;
+  saveSort();
+  $("sortMenu").classList.remove("show");
+  refreshSortBtn();
+  sortTreeData();
+});
+document.addEventListener("click", () => $("sortMenu").classList.remove("show"));
+refreshSortBtn(); // 启动时同步排序按钮状态
 $("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）

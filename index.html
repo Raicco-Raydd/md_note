@@ -201,6 +201,20 @@
   .select-bar button:hover { color: var(--accent); border-color: var(--accent-dim); background: var(--bg); }
   .select-bar button.primary { background: var(--accent-dim); color: #05120f; border-color: transparent; font-weight: 600; }
   .select-bar button.primary:hover { background: var(--accent); }
+  /* 排序菜单 */
+  .sort-menu {
+    position: fixed; z-index: 66; display: none;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px; box-shadow: var(--shadow);
+    flex-direction: column; gap: 2px; min-width: 180px;
+  }
+  .sort-menu.show { display: flex; }
+  .sort-menu button {
+    background: none; border: none; border-radius: 6px; color: var(--text);
+    font-weight: 400; font-size: 13px; text-align: left; padding: 6px 10px; cursor: pointer;
+  }
+  .sort-menu button:hover { background: var(--bg); color: var(--accent); }
+  .sort-menu button.active { color: var(--accent); font-weight: 600; }
   .tree { list-style: none; }
   .tree ul { list-style: none; padding-left: 16px; position: relative; }
   .tree ul.collapsed { display: none; }
@@ -584,6 +598,7 @@
   <aside id="treeAside">
     <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions" id="normalActions">
       <button id="exportBtn" title="导出备份（zip）">📤</button>
+      <button id="sortBtn" title="排序：文件名 · 正序">🔃</button>
       <button id="importBtn" title="导入恢复（zip）">📥</button>
       <button id="newFolderBtn" title="新建文件夹">📁</button>
       <button id="newNoteBtn" title="新建笔记">➕</button>
@@ -676,6 +691,14 @@
 
 <!-- 右键菜单 -->
 <div id="ctxMenu"></div>
+
+<!-- 排序菜单 -->
+<div class="sort-menu" id="sortMenu">
+  <button type="button" data-sort="name-asc">📄 文件名 · 正序</button>
+  <button type="button" data-sort="name-desc">📄 文件名 · 逆序</button>
+  <button type="button" data-sort="time-desc">🕐 时间 · 最新在前</button>
+  <button type="button" data-sort="time-asc">🕐 时间 · 最旧在前</button>
+</div>
 
 <!-- 块编辑器弹出菜单 -->
 <div id="slashMenu" class="pop-menu"></div>
