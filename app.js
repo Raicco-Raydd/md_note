@@ -656,6 +656,8 @@ $("noteTitle").addEventListener("change", () => {
   } else {
     blocks.unshift({ type: "heading", level: 1, content: t });
   }
+  markDirty();
+  scheduleAutoSave();
   renderBlocks();
   setMsg("✏️ 标题已更新，记得保存");
 });
@@ -1913,7 +1915,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.2.1";
+const APP_VERSION = "4.2.2";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
