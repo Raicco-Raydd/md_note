@@ -651,7 +651,7 @@ function buildPreviewSections() {
 
 // 旧 textarea 预览监听已由块编辑器取代（保留 renderPreview 供兼容，不再调用）
 
-// 标题框联动：实时输入 = 更新第一个标题块 + 标记为修改块；失焦 = 同步块编辑器显示
+// 标题框联动：实时输入 = 更新第一个标题块并立即常亮；失焦 = 同步块编辑器显示
 $("noteTitle").addEventListener("input", () => {
   if (!currentNote) return;
   const t = $("noteTitle").value.trim();
@@ -661,6 +661,9 @@ $("noteTitle").addEventListener("input", () => {
     blocks.unshift({ type: "heading", level: 1, content: t });
   }
   modifiedBlocks.add(0);
+  reviewBlocks.add(0);
+  const firstBlk = blockEditor.children[0];
+  if (firstBlk) firstBlk.classList.add("review-hl");
   markDirty();
   scheduleAutoSave();
 });
@@ -1223,14 +1226,16 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
-  // 变更追踪：编辑时不立即常亮；查看模式中常亮的块被用户修改 = 处理，取消常亮
+  // 变更追踪：任何位置修改未保存 → 立即常亮；改回原样 → 取消
   const blk = content.closest(".block");
-  if (blk && blk.classList.contains("review-hl")) {
-    blk.classList.remove("review-hl");
+  if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
+    modifiedBlocks.add(i);
+    reviewBlocks.add(i);
+    if (blk) blk.classList.add("review-hl");
+  } else if (modifiedBlocks.has(i)) {
+    modifiedBlocks.delete(i);
     reviewBlocks.delete(i);
-    modifiedBlocks.delete(i); // 已处理，不再标记
-  } else if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
-    modifiedBlocks.add(i); // 待处理修改（常亮由「查看修改」激活）
+    if (blk) blk.classList.remove("review-hl");
   }
   markDirty();
   scheduleAutoSave();
@@ -1440,6 +1445,7 @@ function switchBlockType(i, type, level) {
   if (type === "heading" && level) nb.level = level;
   blocks[i] = nb;
   modifiedBlocks.add(i); // 类型切换视为修改
+  reviewBlocks.add(i);
   markDirty(); scheduleAutoSave();
   rerenderBlock(i, 0);
 }
@@ -1771,7 +1777,7 @@ $("confirmClose").addEventListener("click", hideConfirm);
 $("confirmExtra").addEventListener("click", () => { const cb = confirmExtraCb; hideConfirm(); if (cb) cb(); });
 $("confirmOverlay").addEventListener("click", (e) => { if (e.target === $("confirmOverlay")) hideConfirm(); });
 
-// 查看修改：激活全部未保存修改块的常亮高亮，并跳到第一处
+// 查看修改：确保所有未保存修改块常亮，并跳到第一处
 function activateReviewHighlight() {
   if (!modifiedBlocks.size) { setMsg("当前笔记没有未保存的修改块", true); return; }
   reviewBlocks = new Set(modifiedBlocks);
@@ -2006,7 +2012,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.6.0";
+const APP_VERSION = "4.7.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
