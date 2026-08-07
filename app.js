@@ -362,6 +362,10 @@ async function openNote(item, row, opts = {}) {
     if (opts.scrollTo) {
       flashToBlock(opts.scrollTo);
       highlightMatchesInBlocks(opts.scrollTo); // 搜索对象文本高亮
+    } else if (searchTerm) {
+      // 搜索状态下点击笔记名：同样定位并高亮搜索对象
+      flashToBlock(searchTerm);
+      highlightMatchesInBlocks(searchTerm);
     }
     if (window.matchMedia("(max-width: 768px)").matches) closeDrawer();
   } catch (err) {
