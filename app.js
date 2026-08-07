@@ -11,6 +11,8 @@ let vaultRoot = null;    // FileSystemDirectoryHandle（FSA 或 OPFS）
 let vaultMode = null;    // "fs" | "opfs"
 let treeData = [];
 let searchTerm = "";
+let searchIndex = null;        // 全文搜索索引：Map<path, {name, title, text}>
+let searchSnippets = new Map(); // 搜索结果摘要：Map<path, snippet>
 let currentNote = null;  // {name, path, handle, content}
 let activeRow = null;
 let blocks = [];          // 块编辑器状态
@@ -65,7 +67,8 @@ async function walkDir(dir, path) {
 
 async function refreshTree() {
   treeData = await walkDir(vaultRoot, "");
-  renderTree(treeData);
+  searchIndex = null; // 目录变更 → 索引失效，下次搜索时重建
+  await renderTree(treeData);
 }
 
 // ── 路径解析 ──────────────────────────
@@ -84,10 +87,15 @@ async function readFileText(handle) {
 }
 
 // ── 笔记树 ────────────────────────────
-function renderTree(items) {
+async function renderTree(items) {
   const ul = $("tree");
   ul.innerHTML = "";
-  const filtered = searchTerm ? filterTree(items) : items;
+  let filtered = items;
+  searchSnippets = new Map();
+  if (searchTerm) {
+    if (!searchIndex) searchIndex = await buildSearchIndex(items);
+    filtered = filterTree(items);
+  }
   if (!filtered.length) {
     ul.innerHTML = '<li class="tree-empty">' + (searchTerm ? "无匹配笔记" : "笔记库为空，点 ➕ 新建") + "</li>";
     return;
@@ -95,11 +103,65 @@ function renderTree(items) {
   filtered.forEach((item) => ul.appendChild(buildNode(item)));
 }
 
+// ── 全文搜索索引 ──────────────────────
+async function buildSearchIndex(items) {
+  const idx = new Map();
+  const walk = async (its) => {
+    for (const it of its) {
+      if (it.kind === "file") {
+        let entry = { name: it.name, title: "", text: "" };
+        try {
+          const handle = await resolveHandle(it.path);
+          const text = await readFileText(handle);
+          if (text.length <= 300000) { // 大文件只按文件名匹配，避免卡顿
+            const t = text.split("\n").find((l) => /^#\s+/.test(l.trim()));
+            entry.title = t ? t.trim().replace(/^#+\s*/, "") : "";
+            entry.text = text;
+          }
+        } catch (e) { /* 读取失败按空索引处理 */ }
+        idx.set(it.path, entry);
+      } else await walk(it.children);
+    }
+  };
+  await walk(items);
+  return idx;
+}
+
+const escapeReg = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function matchScore(entry, q) {
+  if (!entry) return null;
+  if (entry.name.toLowerCase().includes(q)) return { score: 3, where: "name" };
+  if (entry.title && entry.title.toLowerCase().includes(q)) return { score: 2, where: "title", idx: entry.title.toLowerCase().indexOf(q) };
+  if (entry.text) {
+    const i = entry.text.toLowerCase().indexOf(q);
+    if (i >= 0) return { score: 1, where: "text", idx: i };
+  }
+  return null;
+}
+
+function makeSnippet(text, idx, q) {
+  const L = 26, R = 40;
+  const start = Math.max(0, idx - L);
+  const end = Math.min(text.length, idx + q.length + R);
+  let s = text.slice(start, end).replace(/\s+/g, " ").trim();
+  if (start > 0) s = "…" + s;
+  if (end < text.length) s += "…";
+  return s;
+}
+
 function filterTree(items) {
   const out = [];
   for (const it of items) {
     if (it.kind === "file") {
-      if (it.name.toLowerCase().includes(searchTerm)) out.push(it);
+      const e = searchIndex.get(it.path);
+      const hit = matchScore(e, searchTerm);
+      if (hit) {
+        out.push(it);
+        if (hit.where === "text") searchSnippets.set(it.path, makeSnippet(e.text, hit.idx, searchTerm));
+        else if (hit.where === "title") searchSnippets.set(it.path, "标题命中：" + e.title);
+        else searchSnippets.set(it.path, "");
+      }
     } else {
       const kids = filterTree(it.children);
       if (kids.length) out.push({ ...it, children: kids });
@@ -167,6 +229,18 @@ function buildNode(item) {
   row.addEventListener("contextmenu", (e) => showCtxMenu(e, item));
 
   li.appendChild(row);
+
+  // 搜索结果摘要（全文命中时显示上下文片段）
+  if (item.kind === "file" && searchTerm) {
+    const snip = searchSnippets.get(item.path);
+    if (snip) {
+      const div = document.createElement("div");
+      div.className = "search-snippet";
+      div.innerHTML = escapeHtml(snip).replace(new RegExp(escapeReg(searchTerm), "gi"), (m) => "<mark>" + m + "</mark>");
+      li.appendChild(div);
+    }
+  }
+
   if (item.kind === "dir" && item.children.length) {
     const ul = document.createElement("ul");
     item.children.forEach((c) => ul.appendChild(buildNode(c)));
@@ -1103,10 +1177,14 @@ function findRow(path) {
   return null;
 }
 
-// ── 搜索 ──────────────────────────────
+// ── 搜索（防抖 + 全文） ──────────────
+let searchTimer = null;
 $("searchBox").addEventListener("input", (e) => {
   searchTerm = e.target.value.trim().toLowerCase();
-  renderTree(treeData);
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    await renderTree(treeData);
+  }, 200);
 });
 
 // ── 事件 ──────────────────────────────
