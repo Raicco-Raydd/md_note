@@ -13,6 +13,8 @@ let treeData = [];
 let searchTerm = "";
 let searchIndex = null;        // 全文搜索索引：Map<path, {name, title, text}>
 let searchSnippets = new Map(); // 搜索结果摘要：Map<path, snippet>
+let selectMode = false;        // 批量选择模式（导出勾选）
+let selected = new Set();      // 已勾选的笔记路径
 let currentNote = null;  // {name, path, handle, content}
 let activeRow = null;
 let blocks = [];          // 块编辑器状态
@@ -203,49 +205,73 @@ function buildNode(item) {
   const label = document.createElement("span");
   label.className = "tlabel";
   label.textContent = item.name;
+
+  // 批量选择模式：行首插 checkbox，点击行 = 切换勾选
+  let cb = null;
+  if (selectMode) {
+    cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "sel-cb";
+    cb.dataset.path = item.path;
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => { toggleSelect(item); updateSelUI(); });
+    row.classList.add("selecting");
+    row.prepend(cb);
+  }
+
   if (item.kind === "dir") {
     // 收起/展开箭头
     arrow.className = "arrow";
     arrow.textContent = collapsedDirs.has(item.path) ? "▸" : "▾";
     row.append(arrow, ic, label);
-    row.addEventListener("click", () => toggleDir(item.path, row));
+    if (selectMode) {
+      row.addEventListener("click", () => { const c = row.querySelector(".sel-cb"); if (c) { c.checked = !c.checked; c.dispatchEvent(new Event("change")); } });
+    } else {
+      row.addEventListener("click", () => toggleDir(item.path, row));
+    }
   } else {
     row.append(ic, label);
+    if (selectMode) {
+      row.addEventListener("click", () => { const c = row.querySelector(".sel-cb"); if (c) { c.checked = !c.checked; c.dispatchEvent(new Event("change")); } });
+    } else {
+      row.addEventListener("click", () => openNote(item, row));
+    }
   }
   row.title = item.path;
 
-  // 悬停操作按钮
+  // 悬停操作按钮（勾选模式下隐藏，避免误触）
   const acts = document.createElement("span");
   acts.className = "row-actions";
-  const addAct = (icon, title, cls, fn) => {
-    const b = document.createElement("button");
-    b.textContent = icon;
-    b.title = title;
-    if (cls) b.className = cls;
-    b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
-    acts.appendChild(b);
-  };
-  if (item.kind === "file") {
-    addAct("✏️", "重命名", "", () => renameItem(item));
-    addAct("🗑", "删除", "del", () => doDelete(item));
-    row.addEventListener("click", () => openNote(item, row));
-  } else {
-    addAct("➕", "在此新建笔记", "", () => showNameModal({
-      title: "➕ 新建笔记（在 " + item.name + " 内）",
-      placeholder: "笔记名称（.md 自动补全）",
-      okText: "创建",
-      onSubmit: (n) => doCreateNote(n, item.path),
-    }));
-    addAct("📁", "在此新建文件夹", "", () => showNameModal({
-      title: "📁 新建文件夹（在 " + item.name + " 内）",
-      placeholder: "文件夹名称",
-      okText: "创建",
-      onSubmit: (n) => doCreateFolder(item.path, n),
-    }));
-    addAct("✏️", "重命名", "", () => renameItem(item));
-    addAct("🗑", "删除", "del", () => doDelete(item));
+  if (!selectMode) {
+    const addAct = (icon, title, cls, fn) => {
+      const b = document.createElement("button");
+      b.textContent = icon;
+      b.title = title;
+      if (cls) b.className = cls;
+      b.addEventListener("click", (e) => { e.stopPropagation(); fn(); });
+      acts.appendChild(b);
+    };
+    if (item.kind === "file") {
+      addAct("✏️", "重命名", "", () => renameItem(item));
+      addAct("🗑", "删除", "del", () => doDelete(item));
+    } else {
+      addAct("➕", "在此新建笔记", "", () => showNameModal({
+        title: "➕ 新建笔记（在 " + item.name + " 内）",
+        placeholder: "笔记名称（.md 自动补全）",
+        okText: "创建",
+        onSubmit: (n) => doCreateNote(n, item.path),
+      }));
+      addAct("📁", "在此新建文件夹", "", () => showNameModal({
+        title: "📁 新建文件夹（在 " + item.name + " 内）",
+        placeholder: "文件夹名称",
+        okText: "创建",
+        onSubmit: (n) => doCreateFolder(item.path, n),
+      }));
+      addAct("✏️", "重命名", "", () => renameItem(item));
+      addAct("🗑", "删除", "del", () => doDelete(item));
+    }
+    row.appendChild(acts);
   }
-  row.appendChild(acts);
 
   // 右键菜单
   row.addEventListener("contextmenu", (e) => showCtxMenu(e, item));
@@ -1299,6 +1325,106 @@ $("searchBox").addEventListener("input", (e) => {
   }, 200);
 });
 
+// ── 批量选择导出（勾选模式） ─────────
+function enterSelectMode() {
+  selectMode = true;
+  selected.clear();
+  searchTerm = ""; // 清空搜索，全量展示
+  const sb = $("searchBox");
+  if (sb) sb.value = "";
+  $("treeTitleText").textContent = "选择笔记";
+  $("normalActions").style.display = "none";
+  $("selectActions").style.display = "";
+  $("exportBtn").textContent = "📤 导出所选";
+  renderTree(treeData);
+}
+
+function exitSelectMode() {
+  selectMode = false;
+  selected.clear();
+  $("treeTitleText").textContent = "笔记库";
+  $("normalActions").style.display = "";
+  $("selectActions").style.display = "none";
+  $("exportBtn").textContent = "📤 导出";
+  renderTree(treeData);
+}
+
+function toggleSelect(item) {
+  if (item.kind === "file") {
+    selected.has(item.path) ? selected.delete(item.path) : selected.add(item.path);
+  } else {
+    const files = [];
+    const collect = (its) => its.forEach((x) => x.kind === "file" ? files.push(x.path) : collect(x.children));
+    collect(item.children || []);
+    const allSel = files.length > 0 && files.every((f) => selected.has(f));
+    files.forEach((f) => allSel ? selected.delete(f) : selected.add(f));
+  }
+}
+
+function selectAll(invert) {
+  const files = [];
+  const collect = (its) => its.forEach((x) => x.kind === "file" ? files.push(x.path) : collect(x.children));
+  collect(treeData);
+  if (invert) {
+    files.forEach((f) => selected.has(f) ? selected.delete(f) : selected.add(f));
+  } else {
+    const allSel = files.length > 0 && files.every((f) => selected.has(f));
+    if (allSel) selected.clear();
+    else files.forEach((f) => selected.add(f));
+  }
+  updateSelUI();
+}
+
+function updateSelUI() {
+  $("exportBtn").textContent = selectMode ? (selected.size ? `📤 导出所选(${selected.size})` : "📤 导出所选") : "📤 导出";
+  document.querySelectorAll("#tree .sel-cb").forEach((cb) => {
+    const it = findSubtree(treeData, cb.dataset.path);
+    if (!it) return;
+    if (it.kind === "file") {
+      cb.checked = selected.has(it.path);
+      cb.indeterminate = false;
+    } else {
+      const files = [];
+      const collect = (its) => its.forEach((x) => x.kind === "file" ? files.push(x.path) : collect(x.children));
+      collect(it.children || []);
+      const selCnt = files.filter((f) => selected.has(f)).length;
+      cb.checked = files.length > 0 && selCnt === files.length;
+      cb.indeterminate = selCnt > 0 && selCnt < files.length;
+    }
+  });
+}
+
+async function exportSelected() {
+  if (!selected.size) { setMsg("请先勾选要导出的笔记", true); return; }
+  try {
+    const files = [];
+    const walk = async (items) => {
+      for (const it of items) {
+        if (it.kind === "file" && selected.has(it.path)) {
+          const handle = await resolveHandle(it.path);
+          files.push({ path: it.path, content: await readFileText(handle) });
+        } else if (it.kind === "dir") await walk(it.children);
+      }
+    };
+    await walk(treeData);
+    const blob = new Blob([MdBackup.zipStore(files)], { type: "application/zip" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const d = new Date(), pad = (n) => String(n).padStart(2, "0");
+    a.href = url;
+    a.download = "minddepot-selected-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + ".zip";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    const n = files.length;
+    exitSelectMode();
+    setMsg(`📤 已导出 ${n} 个笔记`);
+  } catch (err) {
+    setMsg("导出失败: " + err.message, true);
+  }
+}
+
 // ── 备份导出 / 导入 ──────────────────
 function findSubtree(items, path) {
   for (const it of items) {
@@ -1404,7 +1530,13 @@ async function importBackup() {
 // ── 事件 ──────────────────────────────
 $("openVaultBtn").addEventListener("click", openVault);
 $("saveBtn").addEventListener("click", saveNote);
-$("exportBtn").addEventListener("click", () => exportBackup());
+$("exportBtn").addEventListener("click", () => {
+  if (selectMode) exportSelected();
+  else enterSelectMode();
+});
+$("selAllBtn").addEventListener("click", () => selectAll(false));
+$("selInvertBtn").addEventListener("click", () => selectAll(true));
+$("selClearBtn").addEventListener("click", exitSelectMode);
 $("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）

@@ -181,6 +181,10 @@
   .tree-actions { display: flex; gap: 2px; }
   .tree-actions button { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 4px; }
   .tree-actions button:hover { color: var(--accent); background: var(--bg); }
+  .sel-cb { width: 14px; height: 14px; flex: none; accent-color: var(--accent-dim); cursor: pointer; margin: 0; }
+  .tree-row.selecting { cursor: pointer; }
+  .tree-row.selecting:hover { background: var(--panel-2); }
+  #selectActions button { font-size: 11px; padding: 2px 6px; }
   .tree { list-style: none; }
   .tree ul { list-style: none; padding-left: 16px; position: relative; }
   .tree ul.collapsed { display: none; }
@@ -562,7 +566,11 @@
   <button type="button" id="drawerBtn" class="drawer-btn" title="笔记列表">☰</button>
   <div class="backdrop" id="backdrop"></div>
   <aside id="treeAside">
-    <div class="tree-title"><span>笔记库</span><span class="tree-actions"><button id="exportBtn" title="导出备份（zip）">📤</button><button id="importBtn" title="导入恢复（zip）">📥</button><button id="newFolderBtn" title="新建文件夹">📁</button><button id="newNoteBtn" title="新建笔记">➕</button></span></div>
+    <div class="tree-title"><span id="treeTitleText">笔记库</span><span class="tree-actions">
+      <button id="exportBtn" title="导出备份（zip）">📤</button>
+      <span id="normalActions"><button id="importBtn" title="导入恢复（zip）">📥</button><button id="newFolderBtn" title="新建文件夹">📁</button><button id="newNoteBtn" title="新建笔记">➕</button></span>
+      <span id="selectActions" style="display:none"><button id="selAllBtn" title="全选所有笔记">☑ 全选</button><button id="selInvertBtn" title="反选">⇄ 反选</button><button id="selClearBtn" title="取消选择">✕ 取消</button></span>
+    </span></div>
     <ul class="tree" id="tree"></ul>
   </aside>
 
