@@ -651,20 +651,23 @@ function buildPreviewSections() {
 
 // 旧 textarea 预览监听已由块编辑器取代（保留 renderPreview 供兼容，不再调用）
 
-// 标题框联动：修改 = 更新第一个标题块
-$("noteTitle").addEventListener("change", () => {
+// 标题框联动：实时输入 = 更新第一个标题块 + 标记为修改块；失焦 = 同步块编辑器显示
+$("noteTitle").addEventListener("input", () => {
   if (!currentNote) return;
   const t = $("noteTitle").value.trim();
-  if (!t) return;
   if (blocks.length && blocks[0].type === "heading") {
     blocks[0].content = t;
-  } else {
+  } else if (t) {
     blocks.unshift({ type: "heading", level: 1, content: t });
   }
+  modifiedBlocks.add(0);
   markDirty();
   scheduleAutoSave();
-  renderBlocks();
-  setMsg("✏️ 标题已更新，记得保存");
+});
+$("noteTitle").addEventListener("change", () => {
+  if (!currentNote) return;
+  renderBlocks(); // 失焦同步块编辑器显示
+  syncTitleFromContent();
 });
 
 // ── 自动保存（用户可开关，每分钟）+ 保存状态 ──
@@ -1998,7 +2001,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.5.1";
+const APP_VERSION = "4.5.2";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
