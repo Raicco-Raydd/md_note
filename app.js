@@ -1874,7 +1874,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.0.0";
+const APP_VERSION = "4.1.1";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
