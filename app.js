@@ -1782,6 +1782,39 @@ $("sortMenu").addEventListener("click", (e) => {
 });
 document.addEventListener("click", () => $("sortMenu").classList.remove("show"));
 refreshSortBtn(); // 启动时同步排序按钮状态
+
+// ── 笔记大纲导航 ──────────────────────
+const outlineBtn = $("outlineBtn");
+const outlinePanel = $("outlinePanel");
+
+function renderOutline() {
+  const items = [];
+  blocks.forEach((b, i) => { if (b.type === "heading") items.push({ level: b.level || 1, content: b.content || "", idx: i }); });
+  if (!items.length) {
+    outlinePanel.innerHTML = '<div class="outline-empty">此笔记没有标题块</div>';
+    return;
+  }
+  outlinePanel.innerHTML = items.map((it) =>
+    `<button class="outline-item" data-idx="${it.idx}" style="padding-left:${8 + (it.level - 1) * 14}px">${escapeHtml(it.content) || "(空标题)"}</button>`
+  ).join("");
+  outlinePanel.querySelectorAll(".outline-item").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const el = blockEditor.children[idx];
+      if (el) { el.scrollIntoView({ block: "center", behavior: "smooth" }); flashEl(el); }
+      outlinePanel.classList.remove("show");
+    });
+  });
+}
+
+outlineBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  renderOutline(); // 每次打开实时刷新
+  outlinePanel.classList.toggle("show");
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#outlinePanel") && !e.target.closest("#outlineBtn")) outlinePanel.classList.remove("show");
+});
 $("importBtn").addEventListener("click", importBackup);
 
 // 新建按钮（顶栏 ➕ 与树标题栏 ➕ 都指向根目录新建）
