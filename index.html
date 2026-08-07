@@ -290,6 +290,7 @@
     color: var(--text-dim); font-size: 17px; padding: 5px 10px; cursor: pointer;
     box-shadow: var(--shadow);
   }
+  .outline-btn .ol-lbl { font-size: 13px; font-weight: 600; }
   .outline-btn:hover { color: var(--accent); border-color: var(--accent-dim); }
   .outline-panel {
     position: absolute; top: 80px; right: 10px; z-index: 31;
@@ -621,6 +622,7 @@
     .editor-area { flex-direction: column; }
     .editor-pane { flex: 1 1 45%; }
     .preview-pane { flex: 1 1 55%; border-top: 1px solid var(--border); }
+    .outline-btn .ol-lbl { display: none; } /* 移动端只留图标 */
     .banner { padding: 6px 36px 6px 12px; font-size: 11px; }
     .edit-overlay { width: 100%; }
     .insert-menu { width: calc(100vw - 28px); }
@@ -672,7 +674,7 @@
   <section class="editor-area">
     <div class="editor-pane">
       <input id="noteTitle" placeholder="笔记标题（回车插入标题块）" spellcheck="false" disabled>
-      <button type="button" id="outlineBtn" class="outline-btn" title="笔记大纲">📑</button>
+      <button type="button" id="outlineBtn" class="outline-btn" title="笔记大纲">📑<span class="ol-lbl"> 大纲</span></button>
       <div class="outline-panel" id="outlinePanel"></div>
       <div id="blockEditor" class="block-editor"></div>
       <textarea id="editorText" style="display:none" spellcheck="false" disabled></textarea>
