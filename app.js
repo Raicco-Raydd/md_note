@@ -359,11 +359,33 @@ async function openNote(item, row, opts = {}) {
     activeRow = row || null;
     if (activeRow) activeRow.classList.add("active");
     setMsg(`📄 ${item.path}`);
-    if (opts.scrollTo) flashToBlock(opts.scrollTo);
+    if (opts.scrollTo) {
+      flashToBlock(opts.scrollTo);
+    } else {
+      // 笔记页打开反馈：高亮第一个标题块（无标题则第一个块）
+      const first = document.querySelector("#blockEditor .block.b-heading") || document.querySelector("#blockEditor .block");
+      flashEl(first);
+    }
     if (window.matchMedia("(max-width: 768px)").matches) closeDrawer();
   } catch (err) {
     setMsg("打开失败: " + err.message, true);
   }
+}
+
+// 通用：给块元素加高亮淡出动画（可重放）
+function flashEl(el) {
+  if (!el) return;
+  el.classList.remove("flash-hl");
+  void el.offsetWidth; // 重置动画
+  el.classList.add("flash-hl");
+}
+
+// 按块索引高亮（编辑保存后反馈）
+function flashBlockAt(index) {
+  const el = document.querySelectorAll("#blockEditor .block")[index];
+  if (!el) return;
+  el.scrollIntoView({ block: "center", behavior: "smooth" });
+  flashEl(el);
 }
 
 // 从搜索结果跳转：滚动到包含关键词的块并高亮淡出
@@ -374,9 +396,7 @@ function flashToBlock(q) {
   for (const el of els) {
     if (el.textContent.toLowerCase().includes(ql)) {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
-      el.classList.remove("flash-hl");
-      void el.offsetWidth; // 重置动画
-      el.classList.add("flash-hl");
+      flashEl(el);
       return;
     }
   }
@@ -530,13 +550,18 @@ function parseNewSection(text) {
 }
 
 // 应用结构化编辑：更新内容 + 块 + 自动保存回文件
-async function commitEdit(newText) {
+async function commitEdit(newText, opts = {}) {
   if (!currentNote) return;
   currentNote.content = newText;
   $("editorText").value = newText;
   blocks = MdBlocks.parseBlocks(newText);
   renderBlocks();
   syncTitleFromContent();
+  // 编辑反馈：高亮被修改的区块（按标题定位）
+  if (opts.highlightHeading) {
+    const idx = blocks.findIndex((b) => b.type === "heading" && b.content === opts.highlightHeading);
+    if (idx >= 0) flashBlockAt(idx);
+  }
   try {
     const w = await currentNote.handle.createWritable();
     await w.write(newText);
@@ -553,11 +578,11 @@ async function saveEdit() {
     if (editorMode === "add") {
       const { heading, content } = parseNewSection(editText.value);
       if (!heading) { alert("请填写新标题"); return; }
-      await commitEdit(Mdutils.insertSectionAfter(currentNote.content, editAnchor, heading, content));
+      await commitEdit(Mdutils.insertSectionAfter(currentNote.content, editAnchor, heading, content), { highlightHeading: heading });
     } else if (editorMode === "replace") {
-      await commitEdit(Mdutils.replaceSection(currentNote.content, currentEditHeading, editText.value));
+      await commitEdit(Mdutils.replaceSection(currentNote.content, currentEditHeading, editText.value), { highlightHeading: currentEditHeading });
     } else {
-      await commitEdit(Mdutils.insertAfterHeading(currentNote.content, currentEditHeading, editText.value));
+      await commitEdit(Mdutils.insertAfterHeading(currentNote.content, currentEditHeading, editText.value), { highlightHeading: currentEditHeading });
     }
     closeEditPanel();
   } catch (err) {
