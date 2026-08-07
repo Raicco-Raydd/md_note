@@ -651,7 +651,7 @@ function buildPreviewSections() {
 
 // 旧 textarea 预览监听已由块编辑器取代（保留 renderPreview 供兼容，不再调用）
 
-// 标题框联动：实时输入 = 更新第一个标题块并立即常亮；失焦 = 同步块编辑器显示
+// 标题框联动：实时输入 = 更新第一个标题块并同步显示（仅标记不高亮）；失焦 = 整树同步
 $("noteTitle").addEventListener("input", () => {
   if (!currentNote) return;
   const t = $("noteTitle").value.trim();
@@ -661,9 +661,12 @@ $("noteTitle").addEventListener("input", () => {
     blocks.unshift({ type: "heading", level: 1, content: t });
   }
   modifiedBlocks.add(0);
-  reviewBlocks.add(0);
+  // 同步块编辑器第一个块显示（不整树重建，避免失焦）
   const firstBlk = blockEditor.children[0];
-  if (firstBlk) firstBlk.classList.add("review-hl");
+  if (firstBlk) {
+    const fc = firstBlk.querySelector(".b-content");
+    if (fc) fc.textContent = t;
+  }
   markDirty();
   scheduleAutoSave();
 });
@@ -1226,16 +1229,14 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
-  // 变更追踪：任何位置修改未保存 → 立即常亮；改回原样 → 取消
+  // 修改时仅标记（不高亮）；查看模式中常亮的块被用户编辑 = 处理，取消高亮
   const blk = content.closest(".block");
-  if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
-    modifiedBlocks.add(i);
-    reviewBlocks.add(i);
-    if (blk) blk.classList.add("review-hl");
-  } else if (modifiedBlocks.has(i)) {
-    modifiedBlocks.delete(i);
+  if (blk && blk.classList.contains("review-hl")) {
+    blk.classList.remove("review-hl");
     reviewBlocks.delete(i);
-    if (blk) blk.classList.remove("review-hl");
+    modifiedBlocks.delete(i);
+  } else if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
+    modifiedBlocks.add(i);
   }
   markDirty();
   scheduleAutoSave();
@@ -1444,8 +1445,7 @@ function switchBlockType(i, type, level) {
   const nb = Object.assign(MdBlocks.emptyBlock(type), { content: keep });
   if (type === "heading" && level) nb.level = level;
   blocks[i] = nb;
-  modifiedBlocks.add(i); // 类型切换视为修改
-  reviewBlocks.add(i);
+  modifiedBlocks.add(i); // 类型切换视为修改（仅标记）
   markDirty(); scheduleAutoSave();
   rerenderBlock(i, 0);
 }
@@ -2012,7 +2012,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.7.0";
+const APP_VERSION = "4.8.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
