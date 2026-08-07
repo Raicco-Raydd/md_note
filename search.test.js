@@ -6,9 +6,16 @@ const fs = require("fs");
 const src = fs.readFileSync(__dirname + "/app.js", "utf8");
 
 function grab(name) {
-  // function 声明
-  const m = src.match(new RegExp("(?:async )?function " + name + "\\s*\\([^)]*\\)\\s*\\{[\\s\\S]*?\\n\\}"));
-  if (m) return m[0];
+  // function 声明（平衡括号，支持嵌套）
+  const start = src.indexOf("function " + name + "(");
+  if (start >= 0) {
+    let i = src.indexOf("{", start), depth = 0;
+    for (; i < src.length; i++) {
+      if (src[i] === "{") depth++;
+      else if (src[i] === "}") { depth--; if (depth === 0) break; }
+    }
+    return src.slice(start, i + 1);
+  }
   // const 箭头函数
   const c = src.match(new RegExp("const " + name + "\\s*=\\s*([\\s\\S]*?);\\r?\\n"));
   if (c) return "(" + c[1] + ")";
@@ -21,29 +28,33 @@ function ok(cond, msg) {
   else { fail++; console.log("  ✗ " + msg); }
 }
 
-// 纯函数直接 eval
+// 纯函数直接 eval（matchScore 依赖 matchTerm，注入）
 const escapeReg = eval("(" + grab("escapeReg") + ")");
-const matchScore = eval("(" + grab("matchScore") + ")");
+const matchTerm = new Function("return (" + grab("matchTerm") + ")")();
+const matchScore = new Function("matchTerm", "return (" + grab("matchScore") + ")")(matchTerm);
 const makeSnippet = eval("(" + grab("makeSnippet") + ")");
 
-// filterTree 依赖自由变量，用闭包注入（含其调用的纯函数）
-const makeFT = (index, term, snips) =>
-  new Function("searchIndex", "searchTerm", "searchSnippets", "matchScore", "makeSnippet", "escapeReg",
+// filterTree 依赖自由变量，用闭包注入（含其调用的纯函数）；多词搜索传 searchTerms 数组
+const makeFT = (index, terms, snips) =>
+  new Function("searchIndex", "searchTerms", "searchSnippets", "matchScore", "makeSnippet", "escapeReg",
     "return " + grab("filterTree") + ";"
-  )(index, term, snips, matchScore, makeSnippet, escapeReg);
+  )(index, terms, snips, matchScore, makeSnippet, escapeReg);
 
 console.log("== escapeReg ==");
 ok(escapeReg("a.b") === "a\\.b", "正则特殊字符转义");
 ok(escapeReg("密位") === "密位", "中文无需转义");
 
 console.log("== matchScore ==");
-ok(matchScore({ name: "README.md", title: "", text: "" }, "readme").where === "name", "文件名命中");
-ok(matchScore({ name: "a.md", title: "学习方法论", text: "" }, "方法").where === "title", "标题命中");
-ok(matchScore({ name: "b.md", title: "", text: "这是关于密位测距的记录" }, "密位").where === "text", "正文命中");
-const t = matchScore({ name: "c.md", title: "", text: "一二三四五六七八九十" }, "五六");
+ok(matchScore({ name: "README.md", title: "", text: "" }, ["readme"]).where === "name", "文件名命中");
+ok(matchScore({ name: "a.md", title: "学习方法论", text: "" }, ["方法"]).where === "title", "标题命中");
+ok(matchScore({ name: "b.md", title: "", text: "这是关于密位测距的记录" }, ["密位"]).where === "text", "正文命中");
+const t = matchScore({ name: "c.md", title: "", text: "一二三四五六七八九十" }, ["五六"]);
 ok(t && t.idx === 4, "正文命中位置正确（idx=4）");
-ok(matchScore({ name: "d.md", title: "", text: "无相关内容" }, "不存在") === null, "未命中返回 null");
-ok(matchScore(null, "x") === null, "空索引条目不崩溃");
+ok(matchScore({ name: "d.md", title: "", text: "无相关内容" }, ["不存在"]) === null, "未命中返回 null");
+ok(matchScore(null, ["x"]) === null, "空索引条目不崩溃");
+// 多关键词 AND
+ok(matchScore({ name: "e.md", title: "", text: "包含密位和测距的内容" }, ["密位", "测距"]) !== null, "多词都命中");
+ok(matchScore({ name: "f.md", title: "", text: "只有密位" }, ["密位", "测距"]) === null, "多词一词不中 → 整体不中");
 
 console.log("== makeSnippet ==");
 const long = "A\n".repeat(30) + "明月" + "\nB\n".repeat(30); // 关键词居中，多行文本
@@ -80,15 +91,21 @@ const tree = [
   ]},
 ];
 let snippets = new Map();
-const res = makeFT(index, "python", snippets)(tree);
+const res = makeFT(index, ["python"], snippets)(tree);
 ok(res.length === 1 && res[0].children.length === 1, "正文命中过滤出 1 个文件");
 ok(snippets.get("/notes/plan.md").includes("Python"), "命中摘要已生成");
 snippets = new Map();
-const res2 = makeFT(index, "暑假", snippets)(tree);
+const res2 = makeFT(index, ["暑假"], snippets)(tree);
 ok(res2[0].children.length === 1 && snippets.get("/notes/plan.md").includes("标题命中"), "标题命中标记");
 snippets = new Map();
-const res3 = makeFT(index, "md", snippets)(tree);
+const res3 = makeFT(index, ["md"], snippets)(tree);
 ok(res3[0].children.length === 3, "文件名命中多个文件（.md 后缀）");
+snippets = new Map();
+const res4 = makeFT(index, ["python", "项目"], snippets)(tree);
+ok(res4.length === 1 && res4[0].children.length === 1, "多关键词 AND 过滤（python+项目都命中）");
+snippets = new Map();
+const res5 = makeFT(index, ["python", "函数"], snippets)(tree);
+ok(res5.length === 0, "多关键词一词不中 → 无结果（python+函数不同文件）");
 
 console.log("\n结果: " + pass + " 通过 / " + fail + " 失败");
 process.exit(fail ? 1 : 0);

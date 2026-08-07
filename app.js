@@ -11,6 +11,7 @@ let vaultRoot = null;    // FileSystemDirectoryHandle（FSA 或 OPFS）
 let vaultMode = null;    // "fs" | "opfs"
 let treeData = [];
 let searchTerm = "";
+let searchTerms = [];           // 按分隔符拆分的独立关键词（AND 匹配）
 let searchIndex = null;        // 全文搜索索引：Map<path, {name, title, text}>
 let searchSnippets = new Map(); // 搜索结果摘要：Map<path, snippet>
 let selectMode = false;        // 批量选择模式（导出勾选）
@@ -119,6 +120,7 @@ async function renderTree(items) {
   let filtered = items;
   searchSnippets = new Map();
   if (searchTerm) {
+    searchTerms = toTerms(searchTerm);
     if (!searchIndex) searchIndex = await buildSearchIndex(items);
     filtered = filterTree(items);
   }
@@ -202,15 +204,31 @@ async function buildSearchIndex(items) {
 
 const escapeReg = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-function matchScore(entry, q) {
+// 关键词分隔符：英文/中文逗号、分号、顿号、空白（符号本身不参与匹配）
+const SEARCH_SEP = /[,，;；、\s]+/;
+function toTerms(x) { return Array.isArray(x) ? x : String(x || "").split(SEARCH_SEP).filter(Boolean); }
+
+function matchTerm(entry, q) {
   if (!entry) return null;
-  if (entry.name.toLowerCase().includes(q)) return { score: 3, where: "name" };
-  if (entry.title && entry.title.toLowerCase().includes(q)) return { score: 2, where: "title", idx: entry.title.toLowerCase().indexOf(q) };
+  if (entry.name.toLowerCase().includes(q)) return { score: 3, where: "name", q };
+  if (entry.title && entry.title.toLowerCase().includes(q)) return { score: 2, where: "title", idx: entry.title.toLowerCase().indexOf(q), q };
   if (entry.text) {
     const i = entry.text.toLowerCase().indexOf(q);
-    if (i >= 0) return { score: 1, where: "text", idx: i };
+    if (i >= 0) return { score: 1, where: "text", idx: i, q };
   }
   return null;
+}
+
+// 多关键词 AND 匹配：所有词都必须命中，取最高分命中作为代表（决定摘要）
+function matchScore(entry, terms) {
+  if (!entry || !terms || !terms.length) return null;
+  let best = null;
+  for (const q of terms) {
+    const h = matchTerm(entry, q);
+    if (!h) return null;
+    if (!best || h.score > best.score) best = h;
+  }
+  return best;
 }
 
 function makeSnippet(text, q) {
@@ -250,10 +268,10 @@ function filterTree(items) {
   for (const it of items) {
     if (it.kind === "file") {
       const e = searchIndex.get(it.path);
-      const hit = matchScore(e, searchTerm);
+      const hit = matchScore(e, searchTerms);
       if (hit) {
         out.push(it);
-        if (hit.where === "text") searchSnippets.set(it.path, makeSnippet(e.text, searchTerm));
+        if (hit.where === "text") searchSnippets.set(it.path, makeSnippet(e.text, hit.q));
         else if (hit.where === "title") searchSnippets.set(it.path, "标题命中：" + e.title);
         else searchSnippets.set(it.path, "");
       }
@@ -491,11 +509,13 @@ function flashBlockAt(index) {
 
 // 从搜索结果跳转：滚动到包含关键词的块并高亮淡出
 function flashToBlock(q) {
-  if (!q) return;
-  const ql = q.toLowerCase();
+  const terms = toTerms(q);
+  if (!terms.length) return;
+  const qs = terms.map((t) => t.toLowerCase());
   const els = document.querySelectorAll("#blockEditor .block");
   for (const el of els) {
-    if (el.textContent.toLowerCase().includes(ql)) {
+    const t = el.textContent.toLowerCase();
+    if (qs.some((q) => t.includes(q))) {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
       flashEl(el);
       return;
@@ -503,34 +523,52 @@ function flashToBlock(q) {
   }
 }
 
-// 搜索对象高亮：笔记页内所有匹配文本包 <mark>，1.5s 后淡出、再还原为纯文本
+// 搜索对象高亮：笔记页内所有关键词命中的文本包 <mark>，1.5s 后淡出、再还原为纯文本
 function highlightMatchesInBlocks(q) {
-  if (!q) return;
-  const ql = q.toLowerCase();
+  const terms = toTerms(q);
+  if (!terms.length) return;
+  const qs = terms.map((t) => t.toLowerCase());
   const contents = document.querySelectorAll("#blockEditor .block .b-content");
   const targets = [];
   contents.forEach((el) => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
-      if (walker.currentNode.textContent.toLowerCase().includes(ql)) targets.push(walker.currentNode);
+      const t = walker.currentNode.textContent.toLowerCase();
+      if (qs.some((q) => t.includes(q))) targets.push(walker.currentNode);
     }
   });
   if (!targets.length) return;
   targets.forEach((node) => {
     const text = node.textContent;
     const lower = text.toLowerCase();
+    // 收集所有关键词的命中区间并合并重叠
+    const ranges = [];
+    for (const q of qs) {
+      let from = 0;
+      while (from < text.length) {
+        const i = lower.indexOf(q, from);
+        if (i < 0) break;
+        ranges.push([i, i + q.length]);
+        from = i + q.length;
+      }
+    }
+    ranges.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const r of ranges) {
+      if (merged.length && r[0] <= merged[merged.length - 1][1]) merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], r[1]);
+      else merged.push([...r]);
+    }
     const frag = document.createDocumentFragment();
     let pos = 0;
-    while (pos < text.length) {
-      const i = lower.indexOf(ql, pos);
-      if (i < 0) { frag.appendChild(document.createTextNode(text.slice(pos))); break; }
-      if (i > pos) frag.appendChild(document.createTextNode(text.slice(pos, i)));
+    for (const [s, e] of merged) {
+      if (s > pos) frag.appendChild(document.createTextNode(text.slice(pos, s)));
       const m = document.createElement("mark");
       m.className = "search-hl";
-      m.textContent = text.slice(i, i + ql.length);
+      m.textContent = text.slice(s, e);
       frag.appendChild(m);
-      pos = i + ql.length;
+      pos = e;
     }
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
     node.replaceWith(frag);
   });
   // 1.5s 后淡出，再还原纯文本（mark 不残留，避免干扰后续编辑）
