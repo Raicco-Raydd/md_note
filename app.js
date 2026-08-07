@@ -1218,11 +1218,16 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
-  // 块级变更追踪：与打开时快照比对，标记修改块
+  // 块级变更追踪：与打开时快照比对；已高亮的块被用户再次编辑 = 接管，取消高亮
   if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
-    modifiedBlocks.add(i);
     const blk = content.closest(".block");
-    if (blk) blk.classList.add("block-modified");
+    if (modifiedBlocks.has(i)) {
+      modifiedBlocks.delete(i);
+      if (blk) blk.classList.remove("block-modified");
+    } else {
+      modifiedBlocks.add(i);
+      if (blk) blk.classList.add("block-modified");
+    }
   }
   markDirty();
   scheduleAutoSave();
@@ -1993,7 +1998,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.4.0";
+const APP_VERSION = "4.5.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
