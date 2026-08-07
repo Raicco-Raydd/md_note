@@ -688,6 +688,7 @@ const AUTOSAVE_MS = 60000; // 自动保存周期：每分钟
 let blockSnapshots = [];    // 打开时的块快照（用于 diff）
 let modifiedBlocks = new Set(); // 内容与快照不同的块（待处理）
 let reviewBlocks = new Set();   // 查看修改时激活的常亮块
+let reviewCursor = -1;          // 当前查看的修改处（list 索引，-1 = 未激活/已重置）
 
 function snapOf(b) { return JSON.stringify({ c: b.content, t: b.type, l: b.level, k: b.checked }); }
 function updateTreeDirty() {
@@ -724,6 +725,9 @@ function clearDirty() {
   // 清除修改高亮（保存 = 全部处理完毕）
   modifiedBlocks.clear();
   reviewBlocks.clear();
+  reviewCursor = -1;
+  const nrb = $("nextReviewBtn");
+  if (nrb) nrb.style.display = "none";
   document.querySelectorAll(".review-hl").forEach((el) => el.classList.remove("review-hl"));
 }
 function scheduleAutoSave() {
@@ -1235,6 +1239,7 @@ function onBlockInput(i, content) {
     blk.classList.remove("review-hl");
     reviewBlocks.delete(i);
     modifiedBlocks.delete(i);
+    reviewCursor = -1; // 当前处已处理，下次查看从头开始
   } else if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
     modifiedBlocks.add(i);
   }
@@ -1777,20 +1782,37 @@ $("confirmClose").addEventListener("click", hideConfirm);
 $("confirmExtra").addEventListener("click", () => { const cb = confirmExtraCb; hideConfirm(); if (cb) cb(); });
 $("confirmOverlay").addEventListener("click", (e) => { if (e.target === $("confirmOverlay")) hideConfirm(); });
 
-// 查看修改：确保所有未保存修改块常亮，并跳到第一处
+// 查看修改：确保所有未保存修改块常亮；已激活时跳到下一处（循环）
 function activateReviewHighlight() {
-  if (!modifiedBlocks.size) { setMsg("当前笔记没有未保存的修改块", true); return; }
-  reviewBlocks = new Set(modifiedBlocks);
+  const list = [...modifiedBlocks].sort((a, b) => a - b);
+  if (!list.length) { setMsg("当前笔记没有未保存的修改块", true); return; }
+  reviewBlocks = new Set(list);
   reviewBlocks.forEach((i) => {
     const el = blockEditor.children[i];
     if (el) el.classList.add("review-hl");
   });
-  const idx = Math.min(...modifiedBlocks);
-  gotoBlock(idx);
+  $("nextReviewBtn").style.display = "";
+  reviewCursor = (reviewCursor + 1) % list.length;
+  gotoBlock(list[reviewCursor]);
   const other = dirtyFiles.size - (currentNote && dirtyFiles.has(currentNote.path) ? 1 : 0);
   setMsg(other > 0
-    ? `🔍 已高亮 ${reviewBlocks.size} 处；还有 ${other} 个文件有未保存修改，打开对应文件后再点查看修改`
-    : `🔍 已高亮 ${reviewBlocks.size} 处未保存修改`);
+    ? `🔍 第 ${reviewCursor + 1}/${list.length} 处；还有 ${other} 个文件有未保存修改，打开对应文件后再查看`
+    : `🔍 第 ${reviewCursor + 1}/${list.length} 处未保存修改`);
+}
+
+// 跳到下一处未保存修改（循环）
+function nextReview() {
+  const list = [...modifiedBlocks].sort((a, b) => a - b);
+  if (!list.length) { setMsg("没有更多未保存的修改了", true); return; }
+  reviewBlocks = new Set(list);
+  reviewBlocks.forEach((i) => {
+    const el = blockEditor.children[i];
+    if (el) el.classList.add("review-hl");
+  });
+  $("nextReviewBtn").style.display = "";
+  reviewCursor = (reviewCursor + 1) % list.length;
+  gotoBlock(list[reviewCursor]);
+  setMsg(`🔍 第 ${reviewCursor + 1}/${list.length} 处未保存修改`);
 }
 
 // ── 备份导出 / 导入 ──────────────────
@@ -2016,7 +2038,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.8.3";
+const APP_VERSION = "4.9.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
@@ -2136,6 +2158,7 @@ outlineBtn.addEventListener("click", (e) => {
   renderOutline(); // 每次打开实时刷新
   outlinePanel.classList.toggle("show");
 });
+$("nextReviewBtn").addEventListener("click", nextReview);
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#outlinePanel") && !e.target.closest("#outlineBtn")) outlinePanel.classList.remove("show");
 });
