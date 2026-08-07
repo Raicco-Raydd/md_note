@@ -649,12 +649,13 @@
   /* 未保存文件/修改块高亮 */
   .tree-row.dirty-file { color: var(--accent); }
   .tree-row.dirty-file .tlabel::after { content: "●"; color: var(--accent); margin-left: 4px; font-size: 10px; }
-  .block.block-modified, .block.block-modified:hover {
+  /* 查看修改模式：未保存修改块常亮高亮（「查看修改」激活，保存/修改后取消） */
+  .block.review-hl, .block.review-hl:hover {
     background: rgba(79,214,190,.16);
     box-shadow: inset 3px 0 0 var(--accent);
     border-radius: 4px;
   }
-  .block.block-modified .b-content { color: var(--accent); } /* 修改文字直接变色 */
+  .block.review-hl .b-content { color: var(--accent); }
 
   /* 移动端抽屉 */
   .drawer-btn, .backdrop { display: none; }

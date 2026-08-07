@@ -680,7 +680,8 @@ const AUTOSAVE_MS = 60000; // 自动保存周期：每分钟
 
 // 块级变更追踪（未保存文件中修改部分高亮）
 let blockSnapshots = [];    // 打开时的块快照（用于 diff）
-let modifiedBlocks = new Set(); // 被修改过的块索引
+let modifiedBlocks = new Set(); // 内容与快照不同的块（待处理）
+let reviewBlocks = new Set();   // 查看修改时激活的常亮块
 
 function snapOf(b) { return JSON.stringify({ c: b.content, t: b.type, l: b.level, k: b.checked }); }
 function updateTreeDirty() {
@@ -714,9 +715,10 @@ function clearDirty() {
   $("saveBtn").title = "保存 (Ctrl+S)";
   setSaveState(autoSaveEnabled ? "saved" : "autooff");
   updateTreeDirty();
-  // 清除块级修改高亮
+  // 清除修改高亮（保存 = 全部处理完毕）
   modifiedBlocks.clear();
-  document.querySelectorAll(".block-modified").forEach((el) => el.classList.remove("block-modified"));
+  reviewBlocks.clear();
+  document.querySelectorAll(".review-hl").forEach((el) => el.classList.remove("review-hl"));
 }
 function scheduleAutoSave() {
   clearTimeout(autoSaveTimer);
@@ -1103,7 +1105,7 @@ function phFor(b) {
 function buildBlockEl(b, i) {
   const div = document.createElement("div");
   div.className = "block b-" + b.type + (b.type === "heading" ? " b-h" + (b.level || 1) : "");
-  if (modifiedBlocks.has(i)) div.classList.add("block-modified"); // 未保存的修改块高亮
+  if (reviewBlocks.has(i)) div.classList.add("review-hl"); // 查看修改激活的常亮块（重建保留）
   div.dataset.idx = i;
 
   const ctrl = document.createElement("span");
@@ -1221,16 +1223,14 @@ function onBlockInput(i, content) {
   if (text === "/" && b.content === "") { showSlashMenu(i, content); return; }
   hideSlashMenu();
   b.content = serializeRich(content);
-  // 块级变更追踪：与打开时快照比对；已高亮的块被用户再次编辑 = 接管，取消高亮
-  if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
-    const blk = content.closest(".block");
-    if (modifiedBlocks.has(i)) {
-      modifiedBlocks.delete(i);
-      if (blk) blk.classList.remove("block-modified");
-    } else {
-      modifiedBlocks.add(i);
-      if (blk) blk.classList.add("block-modified");
-    }
+  // 变更追踪：编辑时不立即常亮；查看模式中常亮的块被用户修改 = 处理，取消常亮
+  const blk = content.closest(".block");
+  if (blk && blk.classList.contains("review-hl")) {
+    blk.classList.remove("review-hl");
+    reviewBlocks.delete(i);
+    modifiedBlocks.delete(i); // 已处理，不再标记
+  } else if (blockSnapshots[i] && blockSnapshots[i] !== snapOf(b)) {
+    modifiedBlocks.add(i); // 待处理修改（常亮由「查看修改」激活）
   }
   markDirty();
   scheduleAutoSave();
@@ -1715,7 +1715,7 @@ async function exportSelected() {
     showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
       if (dirty) await saveNote(true);
       doExportSelected();
-    }, "🔍 查看修改", jumpToFirstModified);
+    }, "🔍 查看修改", activateReviewHighlight);
     return;
   }
   doExportSelected();
@@ -1771,9 +1771,14 @@ $("confirmClose").addEventListener("click", hideConfirm);
 $("confirmExtra").addEventListener("click", () => { const cb = confirmExtraCb; hideConfirm(); if (cb) cb(); });
 $("confirmOverlay").addEventListener("click", (e) => { if (e.target === $("confirmOverlay")) hideConfirm(); });
 
-// 跳到当前笔记第一个未保存的修改块
-function jumpToFirstModified() {
+// 查看修改：激活全部未保存修改块的常亮高亮，并跳到第一处
+function activateReviewHighlight() {
   if (!modifiedBlocks.size) { setMsg("当前笔记没有未保存的修改块", true); return; }
+  reviewBlocks = new Set(modifiedBlocks);
+  reviewBlocks.forEach((i) => {
+    const el = blockEditor.children[i];
+    if (el) el.classList.add("review-hl");
+  });
   const idx = Math.min(...modifiedBlocks);
   gotoBlock(idx);
 }
@@ -1798,7 +1803,7 @@ async function exportBackup(basePath = "") {
     showConfirm(`您有 ${dirtyFiles.size} 个文件存在未保存的更改（树中亮绿标记），是否先保存并继续导出？`, "继续导出", async () => {
       if (dirty) await saveNote(true);
       doExport(basePath);
-    }, "🔍 查看修改", jumpToFirstModified);
+    }, "🔍 查看修改", activateReviewHighlight);
     return;
   }
   doExport(basePath);
@@ -2001,7 +2006,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.5.2";
+const APP_VERSION = "4.6.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
