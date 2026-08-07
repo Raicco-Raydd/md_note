@@ -2272,7 +2272,7 @@ document.addEventListener("click", () => $("sortMenu").classList.remove("show"))
 refreshSortBtn(); // 启动时同步排序按钮状态
 
 // 版本号（主题亮绿色，树标题栏左侧）
-const APP_VERSION = "4.12.0";
+const APP_VERSION = "4.13.0";
 (function () {
   const v = $("verBadge");
   if (v) v.textContent = "v" + APP_VERSION;
@@ -2461,6 +2461,21 @@ function syncThemeColor(key) {
   metaTheme.content = dark ? "#0f1115" : "#f6f7f9";
 }
 
+function syncFavicon(key) {
+  const fav = document.getElementById("themeFavicon");
+  if (!fav) return;
+  const light = key === "light" || (key === "auto" && window.matchMedia("(prefers-color-scheme: light)").matches);
+  const base = light ? "./assets/icons/mind-depot-light.png" : "./assets/icons/mind-depot-dark.png";
+  const set = () => {
+    const f = document.getElementById("themeFavicon");
+    if (!f) return;
+    const n = f.cloneNode();
+    n.href = base + "?v=" + Date.now(); // cache-bust：强制浏览器重新拉取并刷新标签页图标
+    f.replaceWith(n);
+  };
+  set();
+  setTimeout(set, 350); // 延时双保险：部分浏览器需等图标资源加载完成后才更新标签页
+}
 function applyTheme(idx, persist) {
   idx = ((idx % THEME_MODES.length) + THEME_MODES.length) % THEME_MODES.length;
   themeIdx = idx;
@@ -2471,6 +2486,7 @@ function applyTheme(idx, persist) {
   themeBtn.innerHTML = m.icon + '<span class="theme-lbl"> ' + m.label + "</span>";
   themeBtn.title = "主题：" + m.label + "（点击切换）";
   syncThemeColor(m.key);
+  syncFavicon(m.key);
 }
 
 (function themeInit() {
@@ -2482,7 +2498,7 @@ function applyTheme(idx, persist) {
   // 跟随系统模式：系统深浅变化时同步浏览器 UI 颜色
   try {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-      if (THEME_MODES[themeIdx].key === "auto") syncThemeColor("auto");
+      if (THEME_MODES[themeIdx].key === "auto") { syncThemeColor("auto"); syncFavicon("auto"); }
     });
   } catch (e) { /* 忽略 */ }
 })();
