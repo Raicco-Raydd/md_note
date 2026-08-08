@@ -1,14 +1,17 @@
-/* MindDepot Note — Service Worker
- * 策略：频繁更新的文件（app.js/index.html/blocks.js）网络优先；
- * 稳定库（marked/highlight/mdutils）缓存优先保离线
+﻿/* MindDepot Note 鈥?Service Worker
+ * 绛栫暐锛氶绻佹洿鏂扮殑鏂囦欢锛坅pp.js/index.html/blocks.js锛夌綉缁滀紭鍏堬紱
+ * 绋冲畾搴擄紙marked/highlight/mdutils锛夌紦瀛樹紭鍏堜繚绂荤嚎
  */
-const CACHE = "md-note-v7";
+const CACHE = "md-note-v8";
 const CORE = [
   "./",
   "./index.html",
   "./app.js",
   "./blocks.js",
   "./rag.js",
+  "./vendor/transformers.js",
+  "./vendor/ort-wasm-simd-threaded.jsep.wasm",
+  "./vendor/ort-wasm-simd-threaded.jsep.mjs",
   "./mdutils.js",
   "./marked.min.js",
   "./highlight.min.js",
@@ -20,7 +23,7 @@ const CORE = [
   "./assets/icons/mind-depot-light-192.png",
   "./assets/icons/mind-depot-light-512.png",
 ];
-const DYNAMIC = ["/index.html", "/app.js", "/blocks.js", "/rag.js"];
+const DYNAMIC = ["/index.html", "/app.js", "/blocks.js", "/rag.js", "/vendor/transformers.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -42,7 +45,7 @@ self.addEventListener("fetch", (e) => {
   const isDynamic = e.request.mode === "navigate" || DYNAMIC.some((p) => url.pathname.endsWith(p));
 
   if (isDynamic) {
-    // 网络优先：保证最新代码，失败回退缓存（离线）
+    // 缃戠粶浼樺厛锛氫繚璇佹渶鏂颁唬鐮侊紝澶辫触鍥為€€缂撳瓨锛堢绾匡級
     e.respondWith(
       fetch(e.request)
         .then((r) => {
@@ -53,7 +56,7 @@ self.addEventListener("fetch", (e) => {
         .catch(() => caches.match(e.request))
     );
   } else {
-    // 缓存优先：稳定库离线可用
+    // 缂撳瓨浼樺厛锛氱ǔ瀹氬簱绂荤嚎鍙敤
     e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
   }
 });

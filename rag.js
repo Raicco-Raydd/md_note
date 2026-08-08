@@ -14,22 +14,30 @@ let ragIndex = null; // { path -> [ {text, vec} ] } 或 null（未构建）
 let ragIndexBuiltAt = 0;
 const RAG_INDEX_TTL_MS = 10 * 60 * 1000; // 索引 10 分钟过期重建
 
-// ── 模型加载（懒加载 + 镜像） ──────────
+// ── 模型加载（懒加载 + 镜像 + 本地 vendor） ──────────
 async function getPipeline() {
   if (ragPipeline) return ragPipeline;
   if (ragLoading) return ragLoading;
   ragLoading = (async () => {
     try {
-      const { pipeline, env } = await import("@huggingface/transformers");
-      // 国内网络：默认 huggingface.co 被墙，走镜像
+      // 本地 ESM 包（vendor/transformers.js），避免 CDN/裸模块解析问题
+      const { pipeline, env } = await import("./vendor/transformers.js");
+      // 国内网络：模型权重走 hf-mirror 镜像
       env.remoteHost = "https://hf-mirror.com";
+      // wasm 推理引擎指向本地 vendor（v3 的 env.backends.onnx.wasm 需安全初始化）
+      try {
+        env.backends.onnx.wasm = env.backends.onnx.wasm || {};
+        env.backends.onnx.wasm.wasmPaths = "./vendor/";
+      } catch (e) {
+        console.warn("⚠️ wasm 路径配置失败（可能影响推理）:", e);
+      }
       ragPipeline = await pipeline("feature-extraction", RAG_MODEL, {
         quantized: true,
         dtype: "q8",
       });
       return ragPipeline;
     } catch (e) {
-      console.warn("⚠️ 语义搜索模型加载失败:", e.message);
+      console.warn("⚠️ 语义搜索模型加载失败:", e);
       return null;
     } finally {
       ragLoading = null;
