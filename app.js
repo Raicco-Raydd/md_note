@@ -125,7 +125,7 @@ async function renderTree(items) {
     filtered = filterTree(items);
   }
   if (!filtered.length) {
-    // 无强匹配：尝试弱匹配推荐（“您是否想要找”）
+    // 无强匹配：先弱匹配推荐（“您是否想要找”），再语义搜索兜底
     if (searchTerm) {
       const sugg = suggestSimilar(searchTerm);
       if (sugg.length) {
@@ -142,13 +142,61 @@ async function renderTree(items) {
             }
           });
         });
+        // 语义搜索兜底（异步，不阻塞）
+        renderSemanticSuggest(ul, searchTerm, items);
         return;
       }
+      // 关键词完全无结果 → 直接语义搜索
+      renderSemanticSuggest(ul, searchTerm, items);
+      return;
     }
     ul.innerHTML = '<li class="tree-empty">' + (searchTerm ? "无匹配笔记" : "笔记库为空，点 ➕ 新建") + "</li>";
     return;
   }
   filtered.forEach((item) => ul.appendChild(buildNode(item)));
+}
+
+// 语义搜索兜底：本地向量检索，无结果时推荐语义相近的笔记
+// 首次触发会加载模型（~90MB），之后复用缓存
+let semanticRagTimer = null;
+async function renderSemanticSuggest(ul, query, items) {
+  if (!window.RAG) return;
+  const q = String(query || "").trim();
+  if (q.length < 2) return;
+  try {
+    const hits = await window.RAG.semanticSearch(q, items, { topK: 4 });
+    if (!hits.length) return;
+    // 去重：与已有 suggest 相同 path 的跳过
+    const existing = new Set(ul.querySelectorAll(".search-suggest").length ? [].map.call(ul.querySelectorAll(".search-suggest"), (el) => el.dataset.path) : []);
+    const fresh = hits.filter((h) => !existing.has(h.path));
+    if (!fresh.length) return;
+    ul.insertAdjacentHTML(
+      "beforeend",
+      '<li class="tree-empty" style="margin-top:8px">🧠 语义搜索（本地模型）：</li>' +
+        fresh
+          .map(
+            (h) =>
+              `<li class="search-suggest" data-path="${escapeHtml(h.path)}" title="相似度 ${h.score.toFixed(2)}">🔍 ${escapeHtml(h.path.split("/").pop().replace(/\.(md|markdown|txt)$/i, ""))} <span class="search-snippet" style="opacity:.7">${escapeHtml((h.chunk || "").slice(0, 40))}</span></li>`
+          )
+          .join("")
+    );
+    ul.querySelectorAll(".search-suggest[data-path]").forEach((el) => {
+      if (el.dataset.path && !el.dataset.bound) {
+        el.dataset.bound = "1";
+        el.addEventListener("click", () => {
+          const node = findSubtree(treeData, el.dataset.path);
+          if (node) {
+            searchTerm = "";
+            const sb = $("searchBox");
+            if (sb) sb.value = "";
+            openNote(node, null);
+          }
+        });
+      }
+    });
+  } catch (e) {
+    console.warn("语义搜索失败:", e);
+  }
 }
 
 // 弱匹配：搜索词字符覆盖度（Jaccard 风格），用于无结果时的推荐

@@ -2,12 +2,13 @@
  * 策略：频繁更新的文件（app.js/index.html/blocks.js）网络优先；
  * 稳定库（marked/highlight/mdutils）缓存优先保离线
  */
-const CACHE = "md-note-v6";
+const CACHE = "md-note-v7";
 const CORE = [
   "./",
   "./index.html",
   "./app.js",
   "./blocks.js",
+  "./rag.js",
   "./mdutils.js",
   "./marked.min.js",
   "./highlight.min.js",
@@ -19,7 +20,7 @@ const CORE = [
   "./assets/icons/mind-depot-light-192.png",
   "./assets/icons/mind-depot-light-512.png",
 ];
-const DYNAMIC = ["/index.html", "/app.js", "/blocks.js"];
+const DYNAMIC = ["/index.html", "/app.js", "/blocks.js", "/rag.js"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
