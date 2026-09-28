@@ -1,11 +1,12 @@
-﻿/* MindDepot Note 鈥?Service Worker
+/* MindDepot Note 鈥?Service Worker
  * 绛栫暐锛氶绻佹洿鏂扮殑鏂囦欢锛坅pp.js/index.html/blocks.js锛夌綉缁滀紭鍏堬紱
  * 绋冲畾搴擄紙marked/highlight/mdutils锛夌紦瀛樹紭鍏堜繚绂荤嚎
  */
-const CACHE = "md-note-v8";
+const CACHE = "md-note-v11";
 const CORE = [
   "./",
   "./index.html",
+  "./beian-mps.png",
   "./app.js",
   "./blocks.js",
   "./rag.js",
